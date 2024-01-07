@@ -2,14 +2,15 @@
 
 #include "include\PerkEntryPointExtenderAPI.h"
 
-float GetEffectiveCastSpeed(RE::ActorMagicCaster* a_AMC, RE::Actor* a,float perkfactor, int castingsource) {
+float GetEffectiveCastSpeed(RE::ActorMagicCaster* a_AMC, RE::Actor* a,float perkfactor) {
 
         float workingperkfactor = perkfactor;
+        auto source = a_AMC->GetCastingSource();
         RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &workingperkfactor, "CastTime", 2, {a_AMC->currentSpell}); // Channel 2 will be the all purpose channel for everything
 
-        if (castingsource == 2) {
+        if (source == RE::MagicSystem::CastingSource::kRightHand) {
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &workingperkfactor, "CastTime", 3, {a_AMC->currentSpell}); // Channel 3 will be the Right Hand Channel
-        } else if (castingsource == 1) {
+        } else if (source == RE::MagicSystem::CastingSource::kLeftHand) {
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &workingperkfactor, "CastTime", 4, {a_AMC->currentSpell}); // Channel 4 will be the Left Hand Channel
         }
 
@@ -17,16 +18,35 @@ float GetEffectiveCastSpeed(RE::ActorMagicCaster* a_AMC, RE::Actor* a,float perk
 
 }
 
-float GetEffectiveDualCast(RE::ActorMagicCaster* a_AMC, RE::Actor* a, float perkfactor, float castingsource) {
+float GetEffectiveConcentrationSpeed(RE::ActorMagicCaster* a_AMC, RE::Actor* a, float perkfactor) {
+        float workingperkfactor = perkfactor;
+        auto source = a_AMC->GetCastingSource();
+        RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &workingperkfactor, "ConcentrationTime", 2,
+                             {a_AMC->currentSpell});  // Channel 2 will be the all purpose channel for everything
+
+        if (source == RE::MagicSystem::CastingSource::kRightHand) {
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &workingperkfactor, "ConcentrationTime", 3,
+                                 {a_AMC->currentSpell});  // Channel 3 will be the Right Hand Channel
+        } else if (source == RE::MagicSystem::CastingSource::kLeftHand) {
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &workingperkfactor, "ConcentrationTime", 4,
+                                 {a_AMC->currentSpell});  // Channel 4 will be the Left Hand Channel
+        }
+
+        return workingperkfactor;
+}
+
+
+float GetEffectiveDualCast(RE::ActorMagicCaster* a_AMC, RE::Actor* a, float perkfactor) {
         float workingperkfactor = perkfactor;
         RE::MagicItem* currentspell = a_AMC->currentSpell;
-        if (castingsource == 2) {
+        auto source = a_AMC->GetCastingSource();
+        if (source == RE::MagicSystem::CastingSource::kRightHand) {
             if (!a_AMC->currentSpell) {
                  currentspell = a->GetActorRuntimeData().selectedSpells[1];
             }
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &workingperkfactor, "DualCast", 3,
                                  {currentspell});  // Channel 3 will be the Right Hand Channel
-        } else if (castingsource == 1) {
+        } else if (source == RE::MagicSystem::CastingSource::kLeftHand) {
             if (!a_AMC->currentSpell) {
                  currentspell = a->GetActorRuntimeData().selectedSpells[0];
             }
@@ -37,6 +57,9 @@ float GetEffectiveDualCast(RE::ActorMagicCaster* a_AMC, RE::Actor* a, float perk
             {currentspell});  // Channel 2 will be the all purpose channel for everything
         return workingperkfactor;
 }
+// need to figure out a way to check if you are actually dualcasting a spell and to then have a separate layer of control
+
+
 //
 //void EvaluateDynamicMGEFs(RE::Actor* a_Actor) {
 //RE::SendHUDMessage
@@ -83,28 +106,30 @@ struct Hooks {
             float updatedtime = a_deltatime;
             auto a = a_AMC->GetCasterAsActor();
             auto source = a_AMC->GetCastingSource();
-            float perkfactor = 1.00f;
+            float castperkfactor = 1.00f;
+            float concentrationperkfactor = 1.00f;
 
-            if (source == RE::MagicSystem::CastingSource::kRightHand && (a_AMC->state.get() == RE::MagicCaster::State::kUnk02)) {
+            if (source == RE::MagicSystem::CastingSource::kRightHand ||
+                source == RE::MagicSystem::CastingSource::kLeftHand) {
 
-                //RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &perkfactor, "CastTime", 2, {a_AMC->currentSpell});
-                perkfactor = GetEffectiveCastSpeed(a_AMC, a, perkfactor, 2);
-                perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
-                perkfactor = std::max(0.05f, perkfactor);
-                updatedtime = a_deltatime * perkfactor;
-            }
-
-            if (source == RE::MagicSystem::CastingSource::kLeftHand && (a_AMC->state.get() == RE::MagicCaster::State::kUnk02)) {
+                if (a_AMC->state.get() == RE::MagicCaster::State::kUnk02) {
+                    
+                    castperkfactor = GetEffectiveCastSpeed(a_AMC, a, castperkfactor);
+                    // perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
+                    castperkfactor = std::max(0.05f, castperkfactor);
+                    updatedtime = a_deltatime * castperkfactor;
                 
+                }
 
-                //RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &perkfactor, "CastTime", 2, {a_AMC->currentSpell});
-                perkfactor = GetEffectiveCastSpeed(a_AMC, a, perkfactor, 1);
-                perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
-                perkfactor = std::max(0.05f, perkfactor);
-                updatedtime = a_deltatime * perkfactor;
+                else if ((a_AMC->state.get() == RE::MagicCaster::State::kCasting) &&
+                         (a_AMC->currentSpell->GetCastingType() == RE::MagicSystem::CastingType::kConcentration)) {
+
+                    concentrationperkfactor = GetEffectiveConcentrationSpeed(a_AMC, a, concentrationperkfactor);
+                    // perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
+                    concentrationperkfactor = std::max(0.05f, concentrationperkfactor);
+                    updatedtime = a_deltatime * concentrationperkfactor;
+                }
             }
-
-
             func(a_AMC, updatedtime);
         }
         static inline REL::Relocation<decltype(thunk)> func;
@@ -116,20 +141,10 @@ struct Hooks {
             auto a = a_AMC->GetCasterAsActor();
             auto source = a_AMC->GetCastingSource();
             float dualcastfactor = 1.00f;
-            if (source == RE::MagicSystem::CastingSource::kRightHand) {
+            if (source == RE::MagicSystem::CastingSource::kRightHand || source == RE::MagicSystem::CastingSource::kLeftHand) {
                 //RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &dualcastfactor, "DualCast", 2,
                 //                     {a_AMC->currentSpell});
-                dualcastfactor = GetEffectiveDualCast(a_AMC, a, dualcastfactor, 2);
-                if (dualcastfactor >= 5) {
-                    //a_AMC->flags.set(RE::ActorMagicCaster::Flags::kDualCasting);
-                    return true;
-                }
-            }
-
-            if (source == RE::MagicSystem::CastingSource::kLeftHand) {
-                //RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &dualcastfactor, "DualCast", 2,
-                //                     {a_AMC->currentSpell});
-                dualcastfactor = GetEffectiveDualCast(a_AMC, a, dualcastfactor, 1);
+                dualcastfactor = GetEffectiveDualCast(a_AMC, a, dualcastfactor);
                 if (dualcastfactor >= 5) {
                     //a_AMC->flags.set(RE::ActorMagicCaster::Flags::kDualCasting);
                     return true;
@@ -201,13 +216,14 @@ void CastSpellItemMult(RE::StaticFunctionTag*, RE::Actor* akSource, RE::SpellIte
 }
 
  
-void CastSpellMult (RE::StaticFunctionTag*, RE::Actor* akSource, RE::TESForm* MagicItem,
-                       RE::TESObjectREFR* akTarget, float a_effectiveness, float a_override) {
+void CastSpellMult(RE::StaticFunctionTag*, RE::Actor* akSource, RE::TESForm* MagicItem, RE::TESObjectREFR* akTarget,
+                   float a_effectiveness, float a_override) {
+    if (MagicItem) {
+       RE::MagicItem* akCastedMagic = MagicItem->As<RE::MagicItem>();
 
-    RE::MagicItem* akCastedMagic = MagicItem->As<RE::MagicItem>();
-
-    akSource->GetMagicCaster(RE::MagicSystem::CastingSource::kInstant)
-        ->CastSpellImmediate(akCastedMagic, false, akTarget, a_effectiveness, false, a_override, akSource);
+       akSource->GetMagicCaster(RE::MagicSystem::CastingSource::kInstant)
+           ->CastSpellImmediate(akCastedMagic, false, akTarget, a_effectiveness, false, a_override, akSource);
+    }
 }
 
 
