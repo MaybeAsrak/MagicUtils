@@ -108,7 +108,8 @@
 
 // Compatible declarations with other sample projects.
 #define DLLEXPORT __declspec(dllexport)
-
+#include <toml++/toml.h>
+#include "include\AutoTOML.h"
 using namespace std::literals;
 using namespace REL::literals;
 
@@ -122,7 +123,17 @@ using namespace REL::literals;
 
 namespace stl {
     using namespace SKSE::stl;
+    template <std::integral T, std::size_t N>
+    void safe_write(std::uintptr_t a_dst, const std::array<T, N>& a_data) {
+        REL::safe_write(a_dst, a_data.data(), a_data.size() * sizeof(T));
+    }
 
+    template <class T>
+    void write_call(std::uintptr_t a_source) {
+        SKSE::AllocTrampoline(14);
+        auto& trampoline = SKSE::GetTrampoline();
+        trampoline.write_call<5>(a_source, T::Call);
+    }
     template <class T>
     void write_thunk_call(std::uintptr_t a_src) {
         SKSE::AllocTrampoline(14);
@@ -131,12 +142,16 @@ namespace stl {
         T::func = trampoline.write_call<5>(a_src, T::thunk);
     }
 
-    template <class F, std::size_t idx, class T>
+    //template <class F, std::size_t idx, class T>
+    //void write_vfunc() {
+    //    REL::Relocation<std::uintptr_t> vtbl{F::VTABLE[0]};
+    //    T::func = vtbl.write_vfunc(idx, T::thunk);
+    //}
+    template <class F, std::size_t idx, class T, std::size_t x = 0>
     void write_vfunc() {
-        REL::Relocation<std::uintptr_t> vtbl{F::VTABLE[0]};
+        REL::Relocation<std::uintptr_t> vtbl{F::VTABLE[x]};
         T::func = vtbl.write_vfunc(idx, T::thunk);
     }
-
     template <std::size_t idx, class T>
     void write_vfunc(REL::VariantID id) {
         REL::Relocation<std::uintptr_t> vtbl{id};
