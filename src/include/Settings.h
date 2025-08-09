@@ -8,16 +8,16 @@ public:
     using sSetting = AutoTOML::sSetting;
     using fSetting = AutoTOML::fSetting;
 
-    static inline bSetting CreatureWeaponSpeed{ "Patches", "Non-actor weaponspeedmult scales attacks", true };
-    static inline bSetting WhirlwindSprint{"Patches", "Whirlwind Sprint Multi-directional", true};
-    static inline fSetting ProjectileSlowZone{"Patches", "Area of effect for slowing projectiles", 50.0f};
-    static inline bSetting MovementSpeedFix{"Patches", "Speedmult less than 0 still works", true};
-    static inline bSetting VariableNPC{"Patches", "Enables NPC randomized attributes", true};
-    static inline fSetting VariableNPCweaponspeed{"Patches", "NPCs have a variable boost up to 10% weaponspeed", 10.0f};
-    static inline fSetting VariableNPCmovementspeed{"Patches", "NPCs have a variable boost up to 10% speedmult", 10.0f};
-    static inline bSetting BowEnchantFix{"Patches", "Bow enchant magnitude affected by bow draw amount", true};
-    static inline bSetting PowerAttackEnchant{"Patches", "Weapon power attacks affect enchant magnitude", true};
-    static inline fSetting PowerAttackEnchantBaseMag{"Patches", "Power attack magnitude base multiplier", 2.0f};
+    static inline bSetting CreatureWeaponSpeed{ "Patches", "CreatureWeaponSpeed", true };
+    static inline bSetting WhirlwindSprint{"Patches", "WhirlwindSprint", true};
+    static inline fSetting ProjectileSlowZone{"Patches", "ProjectileSlowZone", 50.0f};
+    static inline bSetting MovementSpeedFix{"Patches", "MovementSpeedFix", true};
+    static inline bSetting VariableNPC{"Patches", "VariableNPC", true};
+    static inline fSetting VariableNPCweaponspeed{"Patches", "VariableNPCweaponspeed", 10.0f};
+    static inline fSetting VariableNPCmovementspeed{"Patches", "VariableNPCmovementspeed", 10.0f};
+    static inline bSetting BowEnchantFix{"Patches", "BowEnchantFix", true};
+    static inline bSetting PowerAttackEnchant{"Patches", "PowerAttackEnchant", true};
+    static inline fSetting PowerAttackEnchantBaseMag{"Patches", "PowerAttackEnchantBaseMag", 2.0f};
     
 
 
@@ -32,6 +32,7 @@ public:
     {
         try {
             const auto table = toml::parse_file(a_path);
+
             const auto& settings = ISetting::get_settings();
 
             for (const auto& setting : settings) {

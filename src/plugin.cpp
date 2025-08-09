@@ -382,6 +382,10 @@ struct Hooks {
             auto a = a_AMC->GetCasterAsActor();
             auto source = a_AMC->GetCastingSource();
             //RE::ConsoleLog::GetSingleton()->Print("StartCast!");
+            std::vector<RE::SpellItem*> vecSpellsStartCast;
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kApplyReanimateSpell, a, &vecSpellsStartCast, "CastSpell", 15,
+                                 {a_AMC->currentSpell, a});
+            CastSpellsPerk(vecSpellsStartCast, a, a);
             func(a_AMC);
         }
         static inline REL::Relocation<decltype(thunk)> func;
@@ -390,7 +394,7 @@ struct Hooks {
         static void thunk(RE::ActorMagicCaster* a_AMC) {
             auto a = a_AMC->GetCasterAsActor();
             auto source = a_AMC->GetCastingSource();
-            if ((a_AMC->currentSpell->GetCastingType() == RE::MagicSystem::CastingType::kConcentration)) {
+            if ((a_AMC->currentSpell->GetCastingType() != RE::MagicSystem::CastingType::kConcentration)) {
                 if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceStamina")) {
                     float magnitude = 0.0f;
                     for (auto& elements : a_AMC->currentSpell->effects) {
@@ -434,12 +438,12 @@ struct Hooks {
             auto source = a_AMC->GetCastingSource();
             //RE::ConsoleLog::GetSingleton()->Print("FinishCast!");
             std::vector<RE::SpellItem*> vecSpellsSpellHook;
-            RE::HandleEntryPoint(RE::PerkEntryPoint::kApplyReanimateSpell, a, &vecSpellsSpellHook, "OverrideSpell", 4,
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kApplyReanimateSpell, a, &vecSpellsSpellHook, "CastSpell", 16,
                                  {IntendedSpell, a});
             float adjustfactor = 1;
             RE::SpellItem* NewSpell = vecSpellsSpellHook[0];
             if (NewSpell) {
-                RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &adjustfactor, "OverrideSpell", 5,
+                RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &adjustfactor, "CastSpell", 17,
                                      {NewSpell});
 
                 a_AMC->currentSpellCost = NewSpell->CalculateMagickaCost(a)*adjustfactor;
@@ -471,23 +475,23 @@ struct Hooks {
                 maxAV = a_AVO->GetBaseActorValue(index) +
                         a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, index) +
                         a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, index);
-                char buffer[150];
-                sprintf_s(buffer, "avHealth: %f, %f, %f, %f", a_actor->GetActorRuntimeData().staminaModifiers.modifiers[0],
-                          a_AVO->GetBaseActorValue(index),
-                          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, index),
-                          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, index));
-                RE::ConsoleLog::GetSingleton()->Print(buffer);
+                //char buffer[150];
+                //sprintf_s(buffer, "avHealth: %f, %f, %f, %f", a_actor->GetActorRuntimeData().staminaModifiers.modifiers[0],
+                //          a_AVO->GetBaseActorValue(index),
+                //          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, index),
+                //          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, index));
+                //RE::ConsoleLog::GetSingleton()->Print(buffer);
             } else if (index == RE::ActorValue::kStamina) {
                 RE::Actor* a_actor = SKSE::stl::adjust_pointer<RE::Actor>(a_AVO, -0x0B8);
                 maxAV = a_AVO->GetBaseActorValue(index) +
                         a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, index) +
                         a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, index);
-                char buffer[150];
-                sprintf_s(buffer, "avStam: %f, %f, %f, %f", a_actor->GetActorRuntimeData().staminaModifiers.modifiers[0],
-                          a_AVO->GetBaseActorValue(index),
-                          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, index),
-                          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, index));
-                RE::ConsoleLog::GetSingleton()->Print(buffer);
+                //char buffer[150];
+                //sprintf_s(buffer, "avStam: %f, %f, %f, %f", a_actor->GetActorRuntimeData().staminaModifiers.modifiers[0],
+                //          a_AVO->GetBaseActorValue(index),
+                //          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, index),
+                //          a_actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, index));
+                //RE::ConsoleLog::GetSingleton()->Print(buffer);
                 // char buffer[150];
                 //sprintf_s(buffer, "av: %f, %f, %f, %f", a_actor->GetActorRuntimeData().staminaModifiers.modifiers[0],
                 //          a_AVO->GetBaseActorValue(index),
@@ -528,7 +532,7 @@ struct Hooks {
                // RE::ConsoleLog::GetSingleton()->Print("Hello, scritter!");
             } else {
                 CastSpellsWeapon(8, a_AMC, hit.weapon, a_AMC);
-                 RE::ConsoleLog::GetSingleton()->Print("Hello, scritter!");
+                 //RE::ConsoleLog::GetSingleton()->Print("Hello, scritter!");
 
             }
 
@@ -543,28 +547,31 @@ struct Hooks {
             //if (a_AI->GetActorRuntimeData().currentProcess) 
             //   if (a_AI->GetActorRuntimeData().currentProcess->high)
             if (a_AI->GetActorRuntimeData().currentProcess->high->attackData.get()) {
-                if (RE::TESBoundObject* objectweapon = a_AI->GetAttackingWeapon()->object) {
+                if (a_AI->GetAttackingWeapon()) {
                 
-                if (RE::TESObjectWEAP* weap = objectweapon->As<RE::TESObjectWEAP>()) {
-                        RE::AttackData A_Data =
-                            a_AI->GetActorRuntimeData().currentProcess->high->attackData.get()->data;
+                    if (RE::TESBoundObject* objectweapon = a_AI->GetAttackingWeapon()->object) {
+                         if (RE::TESObjectWEAP* weap = objectweapon->As<RE::TESObjectWEAP>()) {
+                            RE::AttackData A_Data =
+                                a_AI->GetActorRuntimeData().currentProcess->high->attackData.get()->data;
 
-                        if (A_Data.flags.any(RE::AttackData::AttackFlag::kPowerAttack) == 1 && a_AI->IsSneaking()) {
-                            if (a_AI->GetActorRuntimeData().currentProcess->high->attackData.get()->data.pad34 != 77) {
-                                RE::ConsoleLog::GetSingleton()->Print("Hello, power!");
+                            if (A_Data.flags.any(RE::AttackData::AttackFlag::kPowerAttack) == 1 && a_AI->IsSneaking()) {
+                                if (a_AI->GetActorRuntimeData().currentProcess->high->attackData.get()->data.pad34 !=
+                                    77) {
+                                // RE::ConsoleLog::GetSingleton()->Print("Hello, power!");
                                 a_AI->GetActorRuntimeData().currentProcess->high->attackData.get()->data.pad34 = 77;
                                 CastSpellsWeapon(9, a_AI, weap, a_AI);
-                            } else {
+                                } else {
                                 a_AI->GetActorRuntimeData().currentProcess->high->attackData.get()->data.pad34 = 74;
+                                }
+                            } else if (A_Data.flags.any(RE::AttackData::AttackFlag::kPowerAttack) == 1 &&
+                                       !a_AI->IsSneaking()) {
+                                // RE::ConsoleLog::GetSingleton()->Print("Hello, normalcy!");
+                                CastSpellsWeapon(10, a_AI, weap, a_AI);
+                            } else {
+                                CastSpellsWeapon(11, a_AI, weap, a_AI);
                             }
-                        } else if (A_Data.flags.any(RE::AttackData::AttackFlag::kPowerAttack) == 1 &&
-                                   !a_AI->IsSneaking()) {
-                            RE::ConsoleLog::GetSingleton()->Print("Hello, normalcy!");
-                            CastSpellsWeapon(10, a_AI, weap, a_AI);
-                        } else {
-                            CastSpellsWeapon(11, a_AI, weap, a_AI);
-                        }
                     }
+                }
             }
             }
             func(a_AI);
@@ -755,7 +762,7 @@ struct Hooks {
                                             RE::ActorValue::kWeaponSpeedMult);
 
                                         RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor,
-                                                             &weaponspeedmult, "TimeScale", 4, {});
+                                                             &weaponspeedmult, "TimeScale", 3, {});
                                         a_Killed->playbackSpeed = weaponspeedmult;
                                     }
                                 }
@@ -804,6 +811,10 @@ struct Hooks {
         static void thunk(RE::Projectile* a_proj, float a_deltTime) {
             // float timescale = 1.0f;
             float timescalered = 1.0f;
+            if (a_proj) {
+            if (a_proj->GetActorCause()) {
+                    if (a_proj->GetActorCause()->actor) {
+                        if (a_proj->GetActorCause()->actor.get()) {
             auto a_actor = a_proj->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
@@ -819,6 +830,10 @@ struct Hooks {
 
             //}
             }
+                        }
+                    }
+            }
+            }
             func(a_proj, (a_deltTime)*timescalered);
         }
         static inline REL::Relocation<decltype(thunk)> func;
@@ -827,6 +842,11 @@ struct Hooks {
         static void thunk(RE::Projectile* a_proje, float a_deltTimes) {
             // float timescale = 1.0f;
             float timescalered = 1.0f;
+            if (a_proje) {
+            if (a_proje->GetActorCause()) {
+                    if (a_proje->GetActorCause()->actor) {
+                        if (a_proje->GetActorCause()->actor.get()) {
+
             auto a_actor = a_proje->GetActorCause()->actor.get().get();
 
             if (a_actor==RE::PlayerCharacter::GetSingleton()) {
@@ -846,6 +866,10 @@ struct Hooks {
 
               //}
             }
+                        }
+                    }
+            }
+            }
             func(a_proje, (a_deltTimes)*timescalered);
         }
         static inline REL::Relocation<decltype(thunk)> func;
@@ -854,6 +878,10 @@ struct Hooks {
         static void thunk(RE::Projectile* a_proj, float a_deltTime) {
             // float timescale = 1.0f;
             float timescalered = 1.0f;
+            if (a_proj) {
+            if (a_proj->GetActorCause()) {
+                    if (a_proj->GetActorCause()->actor) {
+                        if (a_proj->GetActorCause()->actor.get()) {
             auto a_actor = a_proj->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
@@ -871,6 +899,10 @@ struct Hooks {
 
               //}
             }
+                        }
+                    }
+            }
+            }
             func(a_proj, (a_deltTime)*timescalered);
         }
         static inline REL::Relocation<decltype(thunk)> func;
@@ -879,6 +911,10 @@ struct Hooks {
         static void thunk(RE::Projectile* a_proje, float a_deltTimes) {
             // float timescale = 1.0f;
             float timescalered = 1.0f;
+            if (a_proje) {
+            if (a_proje->GetActorCause()) {
+                    if (a_proje->GetActorCause()->actor) {
+                        if (a_proje->GetActorCause()->actor.get()) {
             auto a_actor = a_proje->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
@@ -896,6 +932,10 @@ struct Hooks {
 
               //}
             }
+        }
+    }
+}
+}
             func(a_proje, (a_deltTimes)*timescalered);
         }
         static inline REL::Relocation<decltype(thunk)> func;
@@ -904,6 +944,10 @@ struct Hooks {
         static void thunk(RE::Projectile* a_proje, float a_deltTimes) {
             // float timescale = 1.0f;
             float timescalered = 1.0f;
+            if (a_proje) {
+if (a_proje->GetActorCause()) {
+    if (a_proje->GetActorCause()->actor) {
+        if (a_proje->GetActorCause()->actor.get()) {
             auto a_actor = a_proje->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
@@ -921,6 +965,10 @@ struct Hooks {
 
               //}
             }
+    }
+}
+            }
+        }
             func(a_proje, (a_deltTimes)*timescalered);
         }
         static inline REL::Relocation<decltype(thunk)> func;
@@ -936,7 +984,9 @@ struct Hooks {
 
 
             if (*Settings::WhirlwindSprint==true && a_this == RE::PlayerCharacter::GetSingleton()) {
+                //bool IsDashing = IsAnimPlaying(a_this, std::string("ForwardRoll"));
                 bool IsDashing = IsAnimPlaying(a_this, std::string("Whirlwind"));
+
                 Delta.z = 0.0f;
                 float distance = Delta.Length();
                 RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_this, &distance, "WhirlwindDash", 2, {});
@@ -947,9 +997,9 @@ struct Hooks {
                                 double newangle = double(MovementAngle);
                                 float newY = std::sin(float(newangle) * atan(1) * 4 / 180) * distance;
                                 float newX = std::cos(float(newangle) * atan(1) * 4 / 180) * distance;
-                                // char buffer[150];
-                                // sprintf_s(buffer, "angles: %f, %f, %f, %f, %f", Delta.y, Delta.x, newangle, newY,
-                                // newX); RE::ConsoleLog::GetSingleton()->Print(buffer);
+                                 char buffer[150];
+                                 sprintf_s(buffer, "angles: %f, %f, %f, %f, %f", Delta.y, Delta.x, newangle, newY,
+                                 newX); RE::ConsoleLog::GetSingleton()->Print(buffer);
                                 Delta.x = newX;
                                 Delta.y = newY;
                 } else if (distance > 0.5f) {
@@ -1027,7 +1077,7 @@ struct Hooks {
     struct Character_Update {
         static void thunk(RE::Character* a_char, float a_delta)
         { 
-            if (a_char && *Settings::VariableNPC) {
+            if (a_char && *Settings::VariableNPC==true) {
                 if (a_char->AsActorValueOwner()) {
                                 if (a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("npcAV"))) ==
                                     100.0f) {
@@ -1038,17 +1088,22 @@ struct Hooks {
                         float diceroll1 = float(dist(e2))/100.0f;
                         float diceroll2 = float(dist(e2))/100.0f;
                         
-                        //char buffer[150];
 
-                        //sprintf_s(buffer, "angle2s: %f",
-                        //          a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("npcAV"))));
-                        //RE::ConsoleLog::GetSingleton()->Print(buffer);
-                        a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kSpeedMult,
-                                                                   diceroll1 * (*Settings::VariableNPCmovementspeed));
-                        a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kWeaponSpeedMult, diceroll2 * (*Settings::VariableNPCweaponspeed) / 100.0f);
+                        a_char->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIERS::kPermanent, RE::ActorValue::kSpeedMult,
+                                              diceroll1 * (*Settings::VariableNPCmovementspeed));
+
+                        a_char->AsActorValueOwner()->RestoreActorValue(
+                            RE::ACTOR_VALUE_MODIFIERS::kPermanent, RE::ActorValue::kWeaponSpeedMult,
+                            diceroll2 * (*Settings::VariableNPCweaponspeed) / 100.0f);
                         a_char->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIERS::kPermanent, (LookupActorValueByName("npcAV")), 10.0f);
                         // 
-                         
+/*                        char buffer[150];
+
+                        sprintf_s(buffer, "angle2s: %f %f %f",
+                            a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("npcAV"))),
+                                  diceroll1 * (*Settings::VariableNPCmovementspeed),
+                                  diceroll2 * (*Settings::VariableNPCweaponspeed) / 100.0f);
+                        RE::ConsoleLog::GetSingleton()->Print(buffer);                  */       
                         //a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kSpeedMult, 1.0f);
                         //a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kWeaponSpeedMult, 1.0f);
                         ////a_char->AsActorValueOwner()->ModActorValue((LookupActorValueByName("DummyAV")), 1.0f);
@@ -1268,9 +1323,9 @@ struct Hooks {
         REL::Relocation<std::uintptr_t> CombatTimeHookAddress{RELOCATION_ID(37831, 38785), REL::Relocate(0xEA, 0xF4)};
         stl::write_thunk_call<CombatTimeHook>(CombatTimeHookAddress.address());
 
-        REL::Relocation<std::uintptr_t> MagicTargetUpdateHookAddress{RELOCATION_ID(37831, 38785),
-                                                                     REL::Relocate(0x15C, 0x168)};
-        stl::write_thunk_call<MagicTargetUpdateHook>(MagicTargetUpdateHookAddress.address());
+        //REL::Relocation<std::uintptr_t> MagicTargetUpdateHookAddress{RELOCATION_ID(37831, 38785),
+        //                                                             REL::Relocate(0x15C, 0x168)};
+        //stl::write_thunk_call<MagicTargetUpdateHook>(MagicTargetUpdateHookAddress.address());
 
         if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
             REL::Relocation<std::uintptr_t> targetHMSAE{RELOCATION_ID(0, 38460), REL::Relocate(0x0, 0x1A1)};
@@ -1489,15 +1544,21 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse) {
     SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message *message) {
         if (message->type == SKSE::MessagingInterface::kDataLoaded) {
         
-       // (Settings::load_config("Data/SKSE/Plugins/Asrak.toml"));
+        if (Settings::load_config("Data/SKSE/Plugins/Asrak.toml"s)) {
+                RE::ConsoleLog::GetSingleton()->Print("Atweaks Settings Loaded");
+        } else {
+                RE::ConsoleLog::GetSingleton()->Print("Atweaks Settings not found");
+
+        }
+
         //    Serialization::GetSingleton()->SetGlobalValue(1, LookupActorValueByName("Health"));
-        
-        RE::ConsoleLog::GetSingleton()->Print("Hello, worldssss!");
+            Hooks::Install();
+
+        //RE::ConsoleLog::GetSingleton()->Print("Hello, worldssss!");
    }
         });
     SKSE::GetPapyrusInterface()->Register(PapyrusFunctions);
-   // (Settings::load_config("Data/SKSE/Plugins/Asrak.toml"));
-    Hooks::Install();
+    //(Settings::load_config("Data/SKSE/Plugins/Asrak.toml"s));
     return true;
 }
 //
