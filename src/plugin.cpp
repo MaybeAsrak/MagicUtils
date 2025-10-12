@@ -17,6 +17,7 @@ public:
     mutable std::mutex lock;
 
     std::unordered_map<int, RE::ActorValue> collection;
+    float movementangle = 90.0f;
     // std::vector<RE::ActiveEffect*> LastCastEffect;
     
     static auto GetSingleton() -> Serialization* {
@@ -30,6 +31,13 @@ public:
     static void SetGlobalValue(int a_value, RE::ActorValue a_amount) {
         Serialization::GetSingleton()->collection[a_value] = (a_amount);
     }
+
+        static auto GetMovementAngle() -> float {
+        return Serialization::GetSingleton()->movementangle;
+    }
+        static auto SetMovementAngle(float a_value)  { Serialization::GetSingleton()->movementangle = a_value;
+        }
+
 
     // static void MultGlobalValue(int a_value, float a_amount) {
     //     Serialization::GetSingleton()->collection[a_value] =
@@ -245,93 +253,117 @@ float GetEffectiveDualCast(RE::ActorMagicCaster* a_AMC, RE::Actor* a, float perk
 
 struct Hooks {
     struct Update {
-        static void thunk(RE::ActorMagicCaster* a_AMC, float a_deltatime) {
+            static void thunk(RE::ActorMagicCaster* a_AMC, float a_deltatime) {
+                 float updatedtime = a_deltatime;
+                 auto a = a_AMC->GetCasterAsActor();
+                 auto source = a_AMC->GetCastingSource();
+                 float castperkfactor = 1.00f;
+                 float concentrationperkfactor = 1.00f;
+                 int breakloop = 0;
 
+                 if (source == RE::MagicSystem::CastingSource::kRightHand ||
+                     source == RE::MagicSystem::CastingSource::kLeftHand) {
+                    if (a_AMC->state.get() == RE::MagicCaster::State::kUnk02) {
+                        castperkfactor = GetEffectiveCastSpeed(a_AMC, a, castperkfactor);
+                        // perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
+                        castperkfactor = std::max(0.05f, castperkfactor);
+                        updatedtime = a_deltatime * castperkfactor;
 
-            float updatedtime = a_deltatime;
-            auto a = a_AMC->GetCasterAsActor();
-            auto source = a_AMC->GetCastingSource();
-            float castperkfactor = 1.00f;
-            float concentrationperkfactor = 1.00f;
+                    }
 
-            if (source == RE::MagicSystem::CastingSource::kRightHand ||
-                source == RE::MagicSystem::CastingSource::kLeftHand) {
-
-                if (a_AMC->state.get() == RE::MagicCaster::State::kUnk02) {
-                    
-                    castperkfactor = GetEffectiveCastSpeed(a_AMC, a, castperkfactor);
-                    // perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
-                    castperkfactor = std::max(0.05f, castperkfactor);
-                    updatedtime = a_deltatime * castperkfactor;
-                
-                }
-
-                else if ((a_AMC->state.get() == RE::MagicCaster::State::kCasting) &&
-                         (a_AMC->currentSpell->GetCastingType() == RE::MagicSystem::CastingType::kConcentration)) {
-
-            //if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceStamina")) {
+                    else if ((a_AMC->state.get() == RE::MagicCaster::State::kCasting) &&
+                             (a_AMC->currentSpell->GetCastingType() == RE::MagicSystem::CastingType::kConcentration) &&
+                             a == RE::PlayerCharacter::GetSingleton()) {
+                        // if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceStamina")) {
                         float magnitude = 0.0f;
                         for (auto& elements : a_AMC->currentSpell->effects) {
-                            if (elements->baseEffect->ContainsKeywordString("MagicResourceStamina")) {
-                                magnitude = elements->GetMagnitude();
-                            }
+                        if (elements->baseEffect->ContainsKeywordString("MagicResourceStamina")) {
+                            magnitude = elements->GetMagnitude();
+                        }
                         }
                         // float staminacost = 0.0f;
+                        if (a_AMC->GetIsDualCasting()) {
+                        magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                        }
                         RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
                                              {a_AMC->currentSpell});
+                        if (magnitude * updatedtime < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
                         a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                                  RE::ActorValue::kStamina, -magnitude*updatedtime);
-                    //}
-                    //if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceHealth")) {
-                         magnitude = 0.0f;
+                                                                  RE::ActorValue::kStamina, -magnitude * updatedtime);
+                        } else {
+                        RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
+
+                        breakloop = 1;
+                        // a_AMC->InterruptCast(false);
+                        }
+                        //}
+                        // if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceHealth")) {
+                        magnitude = 0.0f;
                         for (auto& elements : a_AMC->currentSpell->effects) {
-                            if (elements->baseEffect->ContainsKeywordString("MagicResourceHealth")) {
-                                magnitude = elements->GetMagnitude();
-                            }
+                        if (elements->baseEffect->ContainsKeywordString("MagicResourceHealth")) {
+                            magnitude = elements->GetMagnitude();
+                        }
                         }
                         // float healthcost = 0.0f;
+                        if (a_AMC->GetIsDualCasting()) {
+                        magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                        }
                         RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 4,
                                              {a_AMC->currentSpell});
+                        if (magnitude * updatedtime < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kHealth)) {
                         a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                                  RE::ActorValue::kHealth, -magnitude*updatedtime);
-                   // }
+                                                                  RE::ActorValue::kHealth, -magnitude * updatedtime);
+                        } else {
+                        RE::DebugNotification("Not enough health to cast this spell", nullptr, true);
 
-            //if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceStamina")) {
-            //            float magnitude = 0.0f;
-            //            for (auto& elements : a_AMC->currentSpell->effects) {
-            //                if (elements->baseEffect->ContainsKeywordString("MagicResourceStamina")) {
-            //                    magnitude = elements->GetMagnitude();
-            //                }
-            //            }
-            //            // float staminacost = 0.0f;
-            //            RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
-            //                                 {a_AMC->currentSpell});
-            //            a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-            //                                                      RE::ActorValue::kStamina, -magnitude * updatedtime);
-            //        }
-            //        if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceHealth")) {
-            //            float magnitude = 0.0f;
-            //            for (auto& elements : a_AMC->currentSpell->effects) {
-            //                if (elements->baseEffect->ContainsKeywordString("MagicResourceHealth")) {
-            //                    magnitude = elements->GetMagnitude();
-            //                }
-            //            }
-            //            // float healthcost = 0.0f;
-            //            RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 4,
-            //                                 {a_AMC->currentSpell});
-            //            a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-            //                                                      RE::ActorValue::kHealth, -magnitude * updatedtime);
-            //        }
+                        breakloop = 1;
+                        }
+                        // }
 
+                        // if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceStamina")) {
+                        //             float magnitude = 0.0f;
+                        //             for (auto& elements : a_AMC->currentSpell->effects) {
+                        //                 if (elements->baseEffect->ContainsKeywordString("MagicResourceStamina")) {
+                        //                     magnitude = elements->GetMagnitude();
+                        //                 }
+                        //             }
+                        //             // float staminacost = 0.0f;
+                        //             RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude,
+                        //             "SpellCosts", 3,
+                        //                                  {a_AMC->currentSpell});
+                        //             a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                        //                                                       RE::ActorValue::kStamina, -magnitude *
+                        //                                                       updatedtime);
+                        //         }
+                        //         if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceHealth")) {
+                        //             float magnitude = 0.0f;
+                        //             for (auto& elements : a_AMC->currentSpell->effects) {
+                        //                 if (elements->baseEffect->ContainsKeywordString("MagicResourceHealth")) {
+                        //                     magnitude = elements->GetMagnitude();
+                        //                 }
+                        //             }
+                        //             // float healthcost = 0.0f;
+                        //             RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude,
+                        //             "SpellCosts", 4,
+                        //                                  {a_AMC->currentSpell});
+                        //             a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                        //                                                       RE::ActorValue::kHealth, -magnitude *
+                        //                                                       updatedtime);
+                        //         }
 
-                    //concentrationperkfactor = GetEffectiveConcentrationSpeed(a_AMC, a, concentrationperkfactor);
-                    //// perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
-                    //concentrationperkfactor = std::max(0.05f, concentrationperkfactor);
-                    //updatedtime = a_deltatime * concentrationperkfactor;
-                }
+                        // concentrationperkfactor = GetEffectiveConcentrationSpeed(a_AMC, a, concentrationperkfactor);
+                        //// perkfactor = std::min((a_AMC->currentSpell->GetChargeTime()) / a_deltatime, perkfactor);
+                        // concentrationperkfactor = std::max(0.05f, concentrationperkfactor);
+                        // updatedtime = a_deltatime * concentrationperkfactor;
+                    }
+                 }
+                 if (breakloop == 1) {
+                    a_AMC->InterruptCast(false);
+                 }
+                 else {
+                    func(a_AMC, updatedtime);
+                 }
             }
-            func(a_AMC, updatedtime);
-        }
         static inline REL::Relocation<decltype(thunk)> func;
     };
 
@@ -381,12 +413,65 @@ struct Hooks {
         static void thunk(RE::ActorMagicCaster* a_AMC) {
             auto a = a_AMC->GetCasterAsActor();
             auto source = a_AMC->GetCastingSource();
+            int breakloop = 0;
+
             //RE::ConsoleLog::GetSingleton()->Print("StartCast!");
+            if ((a_AMC->currentSpell->GetCastingType() != RE::MagicSystem::CastingType::kConcentration) &&
+                a == RE::PlayerCharacter::GetSingleton()) {
+                float magnitude = 0.0f;
+                for (auto& elements : a_AMC->currentSpell->effects) {
+                    if (elements->baseEffect->ContainsKeywordString("MagicResourceStamina")) {
+                            magnitude = elements->GetMagnitude();
+                    }
+                }
+                if (a_AMC->GetIsDualCasting()) {
+                    magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                }
+                RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
+                                     {a_AMC->currentSpell});
+
+                if (magnitude < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
+                    a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                              RE::ActorValue::kStamina, -magnitude);
+                } else {
+                    RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
+                    breakloop = 1;
+                                    }
+
+
+                magnitude = 0.0f;
+                for (auto& elements : a_AMC->currentSpell->effects) {
+                    if (elements->baseEffect->ContainsKeywordString("MagicResourceHealth")) {
+                            magnitude = elements->GetMagnitude();
+                    }
+                }
+                if (a_AMC->GetIsDualCasting()) {
+                    magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                }
+                RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 4,
+                                     {a_AMC->currentSpell});
+
+                if (magnitude < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kHealth)) {
+                    a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                              RE::ActorValue::kHealth, -magnitude);
+                } else {
+                    RE::DebugNotification("Not enough health to cast this spell", nullptr, true);
+                    breakloop = 1;
+
+                }
+
+            }
             std::vector<RE::SpellItem*> vecSpellsStartCast;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kApplyReanimateSpell, a, &vecSpellsStartCast, "CastSpell", 15,
                                  {a_AMC->currentSpell, a});
             CastSpellsPerk(vecSpellsStartCast, a, a);
-            func(a_AMC);
+            if (breakloop == 1) {
+                //RE::DebugNotification("TestString", nullptr, true);
+                a_AMC->InterruptCast(true);
+            } else {
+                func(a_AMC);
+
+            }
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
@@ -394,34 +479,7 @@ struct Hooks {
         static void thunk(RE::ActorMagicCaster* a_AMC) {
             auto a = a_AMC->GetCasterAsActor();
             auto source = a_AMC->GetCastingSource();
-            if ((a_AMC->currentSpell->GetCastingType() != RE::MagicSystem::CastingType::kConcentration)) {
-                if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceStamina")) {
-                    float magnitude = 0.0f;
-                    for (auto& elements : a_AMC->currentSpell->effects) {
-                            if (elements->baseEffect->ContainsKeywordString("MagicResourceStamina")) {
-                                magnitude = elements->GetMagnitude();
-                            }
-                    }
-                    // float staminacost = 0.0f;
-                    RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
-                                         {a_AMC->currentSpell});
-                    a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                              RE::ActorValue::kStamina, -magnitude);
-                }
-                if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceHealth")) {
-                    float magnitude = 0.0f;
-                    for (auto& elements : a_AMC->currentSpell->effects) {
-                            if (elements->baseEffect->ContainsKeywordString("MagicResourceHealth")) {
-                                magnitude = elements->GetMagnitude();
-                            }
-                    }
-                    // float healthcost = 0.0f;
-                    RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 4,
-                                         {a_AMC->currentSpell});
-                    a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                              RE::ActorValue::kHealth, -magnitude);
-                }
-            }
+
             std::vector<RE::SpellItem*> vecSpellsFinish;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kApplyReanimateSpell, a, &vecSpellsFinish, "CastSpell", 14,
                                  {a_AMC->currentSpell, a});
@@ -616,9 +674,11 @@ struct Hooks {
             //    a_actor->AsActorValueOwner()->GetActorValue(testvalue);
              //float timescaler =
              //   a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftMobilityCondition) / 100.0f;
-             float timescaler =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
-            RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescaler, "TimeScale", 6,
+            float timescaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            timescaler = a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) / 100.0f;
+            }
+                RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescaler, "TimeScale", 6,
                                  {});
             //timestepHealth *= timescalered;
             //float test = 1.0f;
@@ -631,8 +691,11 @@ struct Hooks {
 
     struct MagickaRegenHook {
         static void thunk(RE::Character* a_actor, float timestepMagicka) {
-            float timescaler =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+            float timescaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            timescaler =
+                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) / 100.0f;
+            }
             //float timescaler =
             //    a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftMobilityCondition) / 100.0f;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timestepMagicka, "TimeScale", 6, {});
@@ -645,9 +708,11 @@ struct Hooks {
 
     struct StaminaRegenHook {
         static void thunk(RE::Character* a_actor, float timestepStamina) {
-            float timescaler =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
-
+            float timescaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            timescaler =
+                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) / 100.0f;
+            }
                 //        float timescaler =
                 //a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftMobilityCondition) / 100.0f;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timestepStamina, "TimeScale", 6, {});
@@ -660,9 +725,11 @@ struct Hooks {
 
     struct VoiceRecoveryHook {
         static void thunk(RE::Actor* a_actor, float timestepVoice) {
-            float timescaler =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
-
+            float timescaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            timescaler =
+                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) / 100.0f;
+            }
                 //        float timescaler =
                 //a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftMobilityCondition) / 100.0f;
             //RE::ConsoleLog::GetSingleton()->Print("Hello, playerski!");
@@ -676,8 +743,11 @@ struct Hooks {
 
     struct ShoutingTimeHook {
         static void thunk(RE::Character* a_actor, float timestepShout) {
-            float timescaler =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+            float timescaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            timescaler =
+                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) / 100.0f;
+            }
             //float timescaler =
             //    a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftMobilityCondition) / 100.0f;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timestepShout, "TimeScale", 6, {});
@@ -691,9 +761,11 @@ struct Hooks {
     struct CombatTimeHook {
         static void thunk(RE::Actor* a_actor, float timestepCombat) {
             //float timescale = 1.0f;
-            float timescaler =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
-
+            float timescaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            timescaler =
+                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) / 100.0f;
+            }
                 //        float timescaler =
                 //a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftMobilityCondition) / 100.0f;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timestepCombat, "TimeScale", 6, {});
@@ -778,32 +850,74 @@ struct Hooks {
  
 
      struct ModifyAnimationData {
-        static void thunk(RE::Character* a_this, RE::BSAnimationUpdateData& a_data) {
-            float timescale = 1.0f;
+        static void thunk(RE::Character* a_thisPlayer, RE::BSAnimationUpdateData& a_dataPlayer) {
+            float AnimationScale = 1.0f;
             //float timescaler = a_this->AsActorValueOwner()->GetActorValue(RE::ActorValue::kRightAttackCondition)/100.0f;
-            float timescaler = a_this->AsActorValueOwner()->GetActorValue((LookupActorValueByName("AnimationSpeed")))/100.0f;
-            timescaler *= a_this->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
-            RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_this, &timescale, "TimeScale", 2, {});
-            RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_this, &timescale, "TimeScale", 6, {});
-            a_data.deltaTime *= timescale;
-            a_data.deltaTime *= timescaler;
-            func(a_this, a_data);
+            float AnimationScaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            AnimationScale =
+                a_thisPlayer->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) /
+                100.0f;
+            AnimationScale *=
+                a_thisPlayer->AsActorValueOwner()->GetActorValue((LookupActorValueByName("RightMobilityCondition"))) /
+                100.0f;
+
+            }
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_thisPlayer, &AnimationScaler, "TimeScale", 2,
+                                 {});
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_thisPlayer, &AnimationScaler, "TimeScale", 6,
+                                 {});
+
+            a_dataPlayer.deltaTime *= (AnimationScaler * AnimationScale);
+            //a_data.deltaTime *= timescaler;
+            func(a_thisPlayer, a_dataPlayer);
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
-        
+ 
+          struct ModifyAnimationDataNPC {
+        static void thunk(RE::Character* a_thisNPC, RE::BSAnimationUpdateData& a_dataNPC) {
+            float AnimationScale = 1.0f;
+            // float timescaler =
+            // a_this->AsActorValueOwner()->GetActorValue(RE::ActorValue::kRightAttackCondition)/100.0f;
+            float AnimationScaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            AnimationScale =
+                a_thisNPC->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) /
+                100.0f;
+            AnimationScale *=
+                a_thisNPC->AsActorValueOwner()->GetActorValue((LookupActorValueByName("RightMobilityCondition"))) /
+                100.0f;
+            }
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_thisNPC, &AnimationScaler, "TimeScale", 2,
+                                 {});
+            RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_thisNPC, &AnimationScaler, "TimeScale", 6,
+                                 {});
+
+            a_dataNPC.deltaTime *= (AnimationScaler * AnimationScale);
+            // a_data.deltaTime *= timescaler;
+            func(a_thisNPC, a_dataNPC);
+        }
+        static inline REL::Relocation<decltype(thunk)> func;
+          };
+
+
     struct ModifyMovement {
         static void thunk(RE::Actor* a_this, float a_deltaTime) {
             float timescale = 1.0f;
             //float timescaler =
             //    a_this->AsActorValueOwner()->GetActorValue(RE::ActorValue::kRightAttackCondition) / 100.0f;
-
-            float timescaler = a_this->AsActorValueOwner()->GetActorValue((LookupActorValueByName("AnimationSpeed")))/100.0f;
-            timescaler *= a_this->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale")))/100.0f;
+            float timescaler = 1.0f;
+            if (*Settings::UseVanillaAV == true) {
+            timescaler =
+                a_this->AsActorValueOwner()->GetActorValue((LookupActorValueByName("LeftMobilityCondition"))) / 100.0f;
+            timescaler *=
+                a_this->AsActorValueOwner()->GetActorValue((LookupActorValueByName("RightMobilityCondition"))) / 100.0f;
+            }
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_this, &timescale, "TimeScale", 2, {});
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_this, &timescale, "TimeScale", 6, {});
 
-            func(a_this, timescale * a_deltaTime * timescaler);
+            func(a_this, a_deltaTime * (timescaler*timescale));
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
@@ -818,11 +932,18 @@ struct Hooks {
             auto a_actor = a_proj->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
-            timescalered = a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+                                if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                     (LookupActorValueByName("LeftAttackCondition"))) /
+                                                 100.0f;
+                                }
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 5, {});
             } else if (a_actor) {
-            timescalered =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+            if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+            }
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 4, {});
             //             if (a_proje->GetPosition().GetDistance(RE::PlayerCharacter::GetSingleton()->GetPosition()) <
             // (*Settings::ProjectileSlowZone)) {
@@ -850,14 +971,19 @@ struct Hooks {
             auto a_actor = a_proje->GetActorCause()->actor.get().get();
 
             if (a_actor==RE::PlayerCharacter::GetSingleton()) {
-             timescalered =
-                a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+            if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+            }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 5,
               {});
             } else if (a_actor) {
-
-               timescalered =
-                  a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+              if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+              }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 4,
                {}); 
               //             if (a_proje->GetPosition().GetDistance(RE::PlayerCharacter::GetSingleton()->GetPosition()) <
@@ -885,12 +1011,18 @@ struct Hooks {
             auto a_actor = a_proj->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
-              timescalered =
-                  a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+              if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+              }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 5, {});
             } else if (a_actor) {
-              timescalered =
-                  a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+              if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+              }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 4, {});
               //             if (a_proje->GetPosition().GetDistance(RE::PlayerCharacter::GetSingleton()->GetPosition())
               //             <
@@ -918,12 +1050,18 @@ struct Hooks {
             auto a_actor = a_proje->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
-              timescalered =
-                  a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+              if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+              }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 5, {});
             } else if (a_actor) {
-              timescalered =
-                  a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+              if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+              }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 4, {});
               //             if (a_proje->GetPosition().GetDistance(RE::PlayerCharacter::GetSingleton()->GetPosition())
               //             <
@@ -951,12 +1089,18 @@ if (a_proje->GetActorCause()) {
             auto a_actor = a_proje->GetActorCause()->actor.get().get();
 
             if (a_actor == RE::PlayerCharacter::GetSingleton()) {
-              timescalered =
-                  a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+              if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+              }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 5, {});
             } else if (a_actor) {
-              timescalered =
-                  a_actor->AsActorValueOwner()->GetActorValue((LookupActorValueByName("ProjectileSpeed"))) / 100.0f;
+              if (*Settings::UseVanillaAV == true) {
+                                    timescalered = a_actor->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftAttackCondition"))) /
+                                                   100.0f;
+              }
               RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor, &timescalered, "TimeScale", 4, {});
               //             if (a_proje->GetPosition().GetDistance(RE::PlayerCharacter::GetSingleton()->GetPosition())
               //             <
@@ -974,37 +1118,41 @@ if (a_proje->GetActorCause()) {
         static inline REL::Relocation<decltype(thunk)> func;
     };
     struct ModifyMovementActor {
-        static RE::bhkCharacterController* thunk(RE::Actor* a_this, float a_arg2, const RE::NiPoint3& a_position) {
-            float MovementAngle = a_this->AsActorValueOwner()->GetActorValue(LookupActorValueByName("MovementAngle"));
-            auto Delta = a_position;
+        static RE::bhkCharacterController* thunk(RE::Actor* a_thismmpc, float a_arg2, const RE::NiPoint3& a_positionMMPC) {
+            //float MovementAngle = a_this->AsActorValueOwner()->GetActorValue(LookupActorValueByName("RightAttackCondition"));
+            float MovementAngle = Serialization::GetMovementAngle();
+
+            auto Delta = a_positionMMPC;
             // if (*Settings::WhirlwindSprint) {
             //     RE::ConsoleLog::GetSingleton()->Print("buffer");
             // }
 
 
 
-            if (*Settings::WhirlwindSprint==true && a_this == RE::PlayerCharacter::GetSingleton()) {
+            if (*Settings::WhirlwindSprint == true && a_thismmpc == RE::PlayerCharacter::GetSingleton()) {
                 //bool IsDashing = IsAnimPlaying(a_this, std::string("ForwardRoll"));
-                bool IsDashing = IsAnimPlaying(a_this, std::string("Whirlwind"));
+            bool IsDashing = IsAnimPlaying(a_thismmpc, std::string("Whirlwind"));
 
                 Delta.z = 0.0f;
                 float distance = Delta.Length();
-                RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_this, &distance, "WhirlwindDash", 2, {});
-                distance *=
-                    a_this->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftAttackCondition) / 100.0f;
+                RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_thismmpc, &distance, "WhirlwindDash", 2,
+                                     {});
+                //distance *=
+                //    a_this->AsActorValueOwner()->GetActorValue(RE::ActorValue::kLeftAttackCondition) / 100.0f;
                 double angleOfmovement = std::atan2(Delta.y, Delta.x) * 180 / (atan(1) * 4);
                 if (IsDashing) {
                                 double newangle = double(MovementAngle);
                                 float newY = std::sin(float(newangle) * atan(1) * 4 / 180) * distance;
                                 float newX = std::cos(float(newangle) * atan(1) * 4 / 180) * distance;
-                                 char buffer[150];
-                                 sprintf_s(buffer, "angles: %f, %f, %f, %f, %f", Delta.y, Delta.x, newangle, newY,
-                                 newX); RE::ConsoleLog::GetSingleton()->Print(buffer);
+                                 //char buffer[150];
+                                 //sprintf_s(buffer, "angles: %f, %f, %f, %f, %f", Delta.y, Delta.x, newangle, newY,
+                                 //newX); RE::ConsoleLog::GetSingleton()->Print(buffer);
                                 Delta.x = newX;
                                 Delta.y = newY;
                 } else if (distance > 0.5f) {
-                                a_this->AsActorValueOwner()->SetActorValue((LookupActorValueByName("MovementAngle")),
-                                                                           (angleOfmovement));
+                                Serialization::SetMovementAngle(angleOfmovement);
+                                //a_this->AsActorValueOwner()->SetActorValue((LookupActorValueByName("RightAttackCondition")),
+                                //                                           (angleOfmovement));
 
                                 // char buffer[150];
 
@@ -1012,18 +1160,31 @@ if (a_proje->GetActorCause()) {
                                 //           a_this->AsActorValueOwner()->GetActorValue(LookupActorValueByName("MovementAngle")));
                                 // RE::ConsoleLog::GetSingleton()->Print(buffer);
                 }
-                Delta.z = a_position.z;
+                Delta.z = a_positionMMPC.z;
             }
-            if (*Settings::MovementSpeedFix==true && a_this->AsActorValueOwner()->GetActorValue(RE::ActorValue::kSpeedMult) < 1.0f) {
+            if (*Settings::MovementSpeedFix == true &&
+                a_thismmpc->AsActorValueOwner()->GetActorValue(RE::ActorValue::kSpeedMult) < 1.0f) {
                 Delta.x *= 0.01f;
                 Delta.y *= 0.01f;
 
             }
-            return func(a_this, a_arg2, Delta);
+            return func(a_thismmpc, a_arg2, Delta);
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
 
+        struct ModifyMovementActorNPC {
+        static RE::bhkCharacterController* thunk(RE::Actor* a_NPCmma, float a_arg2a, const RE::NiPoint3& a_positionMMA) {
+            auto Delta = a_positionMMA;
+            if (*Settings::MovementSpeedFix == true &&
+                a_NPCmma->AsActorValueOwner()->GetActorValue(RE::ActorValue::kSpeedMult) < 1.0f) {
+                Delta.x *= 0.01f;
+                Delta.y *= 0.01f;
+            }
+            return func(a_NPCmma, a_arg2a, Delta);
+        }
+        static inline REL::Relocation<decltype(thunk)> func;
+    };
 
 
 
@@ -1032,11 +1193,16 @@ if (a_proje->GetActorCause()) {
             float healthregen = 0.0f;
             float staminaregen = 0.0f;
             float magickaregen = 0.0f;
+            float currenttimescale = 1.0f;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_player, &healthregen, "TimeScale", 8, {});
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_player, &staminaregen, "TimeScale", 9, {});
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_player, &magickaregen, "TimeScale", 10, {});
             if (healthregen > 0.0f) {
-                float currenttimescale = a_player->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+                if (*Settings::UseVanillaAV == true) {
+                                currenttimescale = a_player->AsActorValueOwner()->GetActorValue(
+                                                 (LookupActorValueByName("LeftMobilityCondition"))) /
+                                             100.0f;
+                }
                 //float currenttimescale =
                 //    a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kLeftMobilityCondition)) / 100.0f;
 
@@ -1046,8 +1212,11 @@ if (a_proje->GetActorCause()) {
                     healthregen * a_delta * currenttimescale);
             }
             if (staminaregen > 0.0f) {
-                float currenttimescale =
-                    a_player->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+                if (*Settings::UseVanillaAV == true) {
+                                currenttimescale = a_player->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftMobilityCondition"))) /
+                                                   100.0f;
+                }
                 //float currenttimescale =
                     //a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kLeftMobilityCondition)) / 100.0f;
                 RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_player, &currenttimescale, "TimeScale",
@@ -1057,8 +1226,11 @@ if (a_proje->GetActorCause()) {
                                                                  staminaregen * a_delta * currenttimescale);
             }
             if (magickaregen > 0.0f) {
-                float currenttimescale =
-                    a_player->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+                if (*Settings::UseVanillaAV == true) {
+                                currenttimescale = a_player->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftMobilityCondition"))) /
+                                                   100.0f;
+                }
                 //float currenttimescale =
                     //a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kLeftMobilityCondition)) / 100.0f;
                 RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_player, &currenttimescale, "TimeScale",
@@ -1077,39 +1249,39 @@ if (a_proje->GetActorCause()) {
     struct Character_Update {
         static void thunk(RE::Character* a_char, float a_delta)
         { 
-            if (a_char && *Settings::VariableNPC==true) {
-                if (a_char->AsActorValueOwner()) {
-                                if (a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("npcAV"))) ==
-                                    100.0f) {
-                        std::random_device rd;
-
-                        std::mt19937 e2(rd());
-                        std::uniform_int_distribution<> dist(0, 100);
-                        float diceroll1 = float(dist(e2))/100.0f;
-                        float diceroll2 = float(dist(e2))/100.0f;
-                        
-
-                        a_char->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIERS::kPermanent, RE::ActorValue::kSpeedMult,
-                                              diceroll1 * (*Settings::VariableNPCmovementspeed));
-
-                        a_char->AsActorValueOwner()->RestoreActorValue(
-                            RE::ACTOR_VALUE_MODIFIERS::kPermanent, RE::ActorValue::kWeaponSpeedMult,
-                            diceroll2 * (*Settings::VariableNPCweaponspeed) / 100.0f);
-                        a_char->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIERS::kPermanent, (LookupActorValueByName("npcAV")), 10.0f);
-                        // 
-/*                        char buffer[150];
-
-                        sprintf_s(buffer, "angle2s: %f %f %f",
-                            a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("npcAV"))),
-                                  diceroll1 * (*Settings::VariableNPCmovementspeed),
-                                  diceroll2 * (*Settings::VariableNPCweaponspeed) / 100.0f);
-                        RE::ConsoleLog::GetSingleton()->Print(buffer);                  */       
-                        //a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kSpeedMult, 1.0f);
-                        //a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kWeaponSpeedMult, 1.0f);
-                        ////a_char->AsActorValueOwner()->ModActorValue((LookupActorValueByName("DummyAV")), 1.0f);
-                                }
-                }
-            }
+//            if (a_char && *Settings::VariableNPC==true) {
+//                if (a_char->AsActorValueOwner()) {
+//                                if (a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("npcAV"))) ==
+//                                    100.0f) {
+//                        std::random_device rd;
+//
+//                        std::mt19937 e2(rd());
+//                        std::uniform_int_distribution<> dist(0, 100);
+//                        float diceroll1 = float(dist(e2))/100.0f;
+//                        float diceroll2 = float(dist(e2))/100.0f;
+//                        
+//
+//                        a_char->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIERS::kPermanent, RE::ActorValue::kSpeedMult,
+//                                              diceroll1 * (*Settings::VariableNPCmovementspeed));
+//
+//                        a_char->AsActorValueOwner()->RestoreActorValue(
+//                            RE::ACTOR_VALUE_MODIFIERS::kPermanent, RE::ActorValue::kWeaponSpeedMult,
+//                            diceroll2 * (*Settings::VariableNPCweaponspeed) / 100.0f);
+//                        a_char->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIERS::kPermanent, (LookupActorValueByName("npcAV")), 10.0f);
+//                        // 
+///*                        char buffer[150];
+//
+//                        sprintf_s(buffer, "angle2s: %f %f %f",
+//                            a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("npcAV"))),
+//                                  diceroll1 * (*Settings::VariableNPCmovementspeed),
+//                                  diceroll2 * (*Settings::VariableNPCweaponspeed) / 100.0f);
+//                        RE::ConsoleLog::GetSingleton()->Print(buffer);                  */       
+//                        //a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kSpeedMult, 1.0f);
+//                        //a_char->AsActorValueOwner()->ModActorValue(RE::ActorValue::kWeaponSpeedMult, 1.0f);
+//                        ////a_char->AsActorValueOwner()->ModActorValue((LookupActorValueByName("DummyAV")), 1.0f);
+//                                }
+//                }
+//            }
 
 
 
@@ -1120,12 +1292,16 @@ if (a_proje->GetActorCause()) {
                     float healthregen = 0.0f;
             float staminaregen = 0.0f;
             float magickaregen = 0.0f;
+            float currenttimescale = 1.0f;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_char, &healthregen, "TimeScale", 8, {});
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_char, &staminaregen, "TimeScale", 9, {});
             RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_char, &magickaregen, "TimeScale", 10, {});
             if (healthregen > 0.0f) {
-                float currenttimescale =
-                    a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+                if (*Settings::UseVanillaAV == true) {
+                                currenttimescale = a_char->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftMobilityCondition"))) /
+                                                   100.0f;
+                }
                 //float currenttimescale =
                     //a_char->AsActorValueOwner()->GetActorValue((RE::ActorValue::kLeftMobilityCondition)) / 100.0f;
                 RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_char, &currenttimescale, "TimeScale",
@@ -1135,8 +1311,11 @@ if (a_proje->GetActorCause()) {
                                                                  healthregen * a_delta * currenttimescale);
             }
             if (staminaregen > 0.0f) {
-                float currenttimescale =
-                    a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+                if (*Settings::UseVanillaAV == true) {
+                                currenttimescale = a_char->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftMobilityCondition"))) /
+                                                   100.0f;
+                }
                 //float currenttimescale =
                     //a_char->AsActorValueOwner()->GetActorValue((RE::ActorValue::kLeftMobilityCondition)) / 100.0f;
                 RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_char, &currenttimescale, "TimeScale",
@@ -1146,8 +1325,11 @@ if (a_proje->GetActorCause()) {
                                                                  staminaregen * a_delta * currenttimescale);
             }
             if (magickaregen > 0.0f) {
-                float currenttimescale =
-                    a_char->AsActorValueOwner()->GetActorValue((LookupActorValueByName("TimeScale"))) / 100.0f;
+                if (*Settings::UseVanillaAV == true) {
+                                currenttimescale = a_char->AsActorValueOwner()->GetActorValue(
+                                                       (LookupActorValueByName("LeftMobilityCondition"))) /
+                                                   100.0f;
+                }
                 //float currenttimescale =
                     //a_char->AsActorValueOwner()->GetActorValue((RE::ActorValue::kLeftMobilityCondition)) / 100.0f;
                 RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_char, &currenttimescale, "TimeScale",
@@ -1226,15 +1408,16 @@ if (a_proje->GetActorCause()) {
         struct MeleeEnchantHook {
             static void thunk(RE::MagicCaster* a_MC, RE::MagicItem* a_MI, RE::Actor* a_target, void* boundobject,
                               bool arg_bool) {
-            if (a_MC->GetCasterAsActor() && *Settings::PowerAttackEnchant) {
+            if (a_MC->GetCasterAsActor()) {
                 if (a_MC->GetCasterAsActor()->GetActorRuntimeData().currentProcess) {
                                 if (a_MC->GetCasterAsActor()
                                         ->GetActorRuntimeData()
                                         .currentProcess->high->attackData.get()) {
-                        if (a_MC->GetCasterAsActor()
+                        if ((a_MC->GetCasterAsActor()
                                 ->GetActorRuntimeData()
-                                .currentProcess->high->attackData.get()
-                                ->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack) == 1) {
+                                .currentProcess->high->attackData.get()->data.flags.any(
+             RE::AttackData::AttackFlag::kPowerAttack) == 1) &&
+        *Settings::PowerAttackEnchant) {
                             float a_effectiveness = *Settings::PowerAttackEnchantBaseMag;
                             float extracost = 0.0f;
                             RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a_MC->GetCasterAsActor(),
@@ -1278,16 +1461,16 @@ if (a_proje->GetActorCause()) {
        stl::write_vfunc<RE::ActorMagicCaster, 0x07, FinishCastingHook, 0>();        
        // 
        // 
-       // 
+       //// 
         stl::write_vfunc<RE::PlayerCharacter, 0x0EF, StartHitting, 0>();
-       stl::write_vfunc<RE::PlayerCharacter, 0x0C8, ModifyMovementActor, 0>();
-        stl::write_vfunc<RE::Character, 0x0C8, ModifyMovementActor, 0>();
+        stl::write_vfunc<RE::PlayerCharacter, 0x0C8, ModifyMovementActor, 0>();
+        stl::write_vfunc<RE::Character, 0x0C8, ModifyMovementActorNPC, 0>();
 
 
        // //stl::write_vfunc<RE::PlayerCharacter, 0x1, StartApplying, 4>();
        // //stl::write_vfunc<RE::Character, 0x1, StartApplying, 4>();
        stl::write_vfunc<RE::PlayerCharacter, 0x79, ModifyAnimationData, 0>();
-       stl::write_vfunc<RE::Character, 0x79, ModifyAnimationData, 0>();
+       stl::write_vfunc<RE::Character, 0x79, ModifyAnimationDataNPC, 0>();
        stl::write_vfunc<RE::hkbClipGenerator, 0x05, AnimationSpeed, 0>();
 
         // stl::write_vfunc<RE::Projectile, 0xAB, ProjectileUpdateHook>();
@@ -1326,6 +1509,24 @@ if (a_proje->GetActorCause()) {
         //REL::Relocation<std::uintptr_t> MagicTargetUpdateHookAddress{RELOCATION_ID(37831, 38785),
         //                                                             REL::Relocate(0x15C, 0x168)};
         //stl::write_thunk_call<MagicTargetUpdateHook>(MagicTargetUpdateHookAddress.address());
+
+        
+        //if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+        //    REL::Relocation<std::uintptr_t> DualCastSpellCheck{RELOCATION_ID(0, 38765), REL::Relocate(0x0, 0x8D)};
+        //    REL::safe_fill(DualCastSpellCheck.address(), REL::NOP, 0x9);
+
+        //} else {
+        //    REL::Relocation<std::uintptr_t> DualCastSpellCheck{RELOCATION_ID(0, 0), REL::Relocate(0x0, 0x0)};
+        //    REL::safe_fill(DualCastSpellCheck.address(), REL::NOP, 0x9);
+        //}
+
+        //REL::Relocation<std::uintptr_t> MagickaRegenHookAddress{RELOCATION_ID(37831, 0),
+        //                                                        REL::Relocate(0x196, 0)};
+        //stl::write_thunk_call<MagickaRegenHook>(MagickaRegenHookAddress.address());
+
+
+
+
 
         if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
             REL::Relocation<std::uintptr_t> targetHMSAE{RELOCATION_ID(0, 38460), REL::Relocate(0x0, 0x1A1)};

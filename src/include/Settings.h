@@ -18,7 +18,7 @@ public:
     static inline bSetting BowEnchantFix{"Patches", "BowEnchantFix", true};
     static inline bSetting PowerAttackEnchant{"Patches", "PowerAttackEnchant", true};
     static inline fSetting PowerAttackEnchantBaseMag{"Patches", "PowerAttackEnchantBaseMag", 2.0f};
-    
+    static inline bSetting UseVanillaAV{"Patches", "UseVanillaAV", true};   
 
 
 
