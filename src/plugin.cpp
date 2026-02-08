@@ -424,20 +424,21 @@ struct Hooks {
                             magnitude = elements->GetMagnitude();
                     }
                 }
-                if (a_AMC->GetIsDualCasting()) {
-                    magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                if (magnitude > 0.0f) {
+                    if (a_AMC->GetIsDualCasting()) {
+                            magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                    }
+                    RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
+                                         {a_AMC->currentSpell});
+
+                    if (magnitude < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
+                            a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                                      RE::ActorValue::kStamina, -magnitude);
+                    } else {
+                            RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
+                            breakloop = 1;
+                    }
                 }
-                RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
-                                     {a_AMC->currentSpell});
-
-                if (magnitude < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
-                    a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                              RE::ActorValue::kStamina, -magnitude);
-                } else {
-                    RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
-                    breakloop = 1;
-                                    }
-
 
                 magnitude = 0.0f;
                 for (auto& elements : a_AMC->currentSpell->effects) {
@@ -815,7 +816,7 @@ struct Hooks {
                     auto a_actor = a_graph->holder;
                     bool attacking = false;
                     std::string_view human = "ActorTypeNPC";
-
+                    int hitframes;
                     //if (a_actor && a_actor == RE::PlayerCharacter::GetSingleton()) {
                     //    // if (IsCurrentAnimSubString(a_Killed->animationName.c_str(), "Whirlwind")) {
 
@@ -830,13 +831,28 @@ struct Hooks {
                             if (a_Killed->triggers.get()) {
                                 for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
                                     if (a_Killed->triggers.get()->triggers[i].event.id == id) {
-                                        auto weaponspeedmult = a_actor->AsActorValueOwner()->GetActorValue(
-                                            RE::ActorValue::kWeaponSpeedMult);
-
-                                        RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor,
-                                                             &weaponspeedmult, "TimeScale", 3, {});
-                                        a_Killed->playbackSpeed = weaponspeedmult;
+                                    ++hitframes;
                                     }
+                                }
+                                if (hitframes > 0) {
+                                    auto weaponspeedmult =
+                                        a_actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kWeaponSpeedMult);
+
+                                    RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor,
+                                                         &weaponspeedmult, "TimeScale", 3, {});
+                                    a_Killed->playbackSpeed = weaponspeedmult;
+                                }
+                            }
+                        } else {
+                            auto id = get_implicit_id_event(a_context.behavior, "HitFrame");
+                            if (a_Killed->triggers.get()) {
+                                for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
+                                    if (a_Killed->triggers.get()->triggers[i].event.id == id) {
+                                    ++hitframes;
+                                    }
+                                }
+                                if (hitframes > 1) {
+                                    a_Killed->playbackSpeed *= 0.33f + float(1/(hitframes+1));
                                 }
                             }
                         }
@@ -1126,7 +1142,7 @@ if (a_proje->GetActorCause()) {
             // if (*Settings::WhirlwindSprint) {
             //     RE::ConsoleLog::GetSingleton()->Print("buffer");
             // }
-
+            
 
 
             if (*Settings::WhirlwindSprint == true && a_thismmpc == RE::PlayerCharacter::GetSingleton()) {
