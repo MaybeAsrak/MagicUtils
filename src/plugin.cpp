@@ -281,20 +281,24 @@ struct Hooks {
                             magnitude = elements->GetMagnitude();
                         }
                         }
-                        // float staminacost = 0.0f;
-                        if (a_AMC->GetIsDualCasting()) {
-                        magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
-                        }
-                        RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
-                                             {a_AMC->currentSpell});
-                        if (magnitude * updatedtime < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
-                        a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                                  RE::ActorValue::kStamina, -magnitude * updatedtime);
-                        } else {
-                        RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
+                        if (magnitude > 0.0f) {
+                            // float staminacost = 0.0f;
+                            if (a_AMC->GetIsDualCasting()) {
+                                magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                            }
+                            RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
+                                                 {a_AMC->currentSpell});
+                            if (magnitude * updatedtime <
+                                a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
+                                a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                                          RE::ActorValue::kStamina,
+                                                                          -magnitude * updatedtime);
+                            } else {
+                                RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
 
-                        breakloop = 1;
-                        // a_AMC->InterruptCast(false);
+                                breakloop = 1;
+                                // a_AMC->InterruptCast(false);
+                            }
                         }
                         //}
                         // if (a_AMC->currentSpell->ContainsKeywordString("MagicResourceHealth")) {
@@ -305,18 +309,22 @@ struct Hooks {
                         }
                         }
                         // float healthcost = 0.0f;
-                        if (a_AMC->GetIsDualCasting()) {
-                        magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
-                        }
-                        RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 4,
-                                             {a_AMC->currentSpell});
-                        if (magnitude * updatedtime < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kHealth)) {
-                        a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                                  RE::ActorValue::kHealth, -magnitude * updatedtime);
-                        } else {
-                        RE::DebugNotification("Not enough health to cast this spell", nullptr, true);
+                        if (magnitude > 0.0f) {
+                            if (a_AMC->GetIsDualCasting()) {
+                                magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                            }
+                            RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 4,
+                                                 {a_AMC->currentSpell});
+                            if (magnitude * updatedtime <
+                                a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kHealth)) {
+                                a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                                          RE::ActorValue::kHealth,
+                                                                          -magnitude * updatedtime);
+                            } else {
+                                RE::DebugNotification("Not enough health to cast this spell", nullptr, true);
 
-                        breakloop = 1;
+                                breakloop = 1;
+                            }
                         }
                         // }
 
@@ -415,35 +423,35 @@ struct Hooks {
             auto source = a_AMC->GetCastingSource();
             int breakloop = 0;
 
-            //RE::ConsoleLog::GetSingleton()->Print("StartCast!");
+            // RE::ConsoleLog::GetSingleton()->Print("StartCast!");
             if ((a_AMC->currentSpell->GetCastingType() != RE::MagicSystem::CastingType::kConcentration) &&
                 a == RE::PlayerCharacter::GetSingleton()) {
                 float magnitude = 0.0f;
                 for (auto& elements : a_AMC->currentSpell->effects) {
                     if (elements->baseEffect->ContainsKeywordString("MagicResourceStamina")) {
-                            magnitude = elements->GetMagnitude();
+                        magnitude = elements->GetMagnitude();
                     }
                 }
                 if (magnitude > 0.0f) {
                     if (a_AMC->GetIsDualCasting()) {
-                            magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
+                        magnitude = RE::MagicFormulas::CalcDualCastCost(magnitude);
                     }
                     RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &magnitude, "SpellCosts", 3,
                                          {a_AMC->currentSpell});
 
                     if (magnitude < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
-                            a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
-                                                                      RE::ActorValue::kStamina, -magnitude);
+                        a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                                  RE::ActorValue::kStamina, -magnitude);
                     } else {
-                            RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
-                            breakloop = 1;
+                        RE::DebugNotification("Not enough stamina to cast this spell", nullptr, true);
+                        breakloop = 1;
                     }
                 }
 
                 magnitude = 0.0f;
                 for (auto& elements : a_AMC->currentSpell->effects) {
                     if (elements->baseEffect->ContainsKeywordString("MagicResourceHealth")) {
-                            magnitude = elements->GetMagnitude();
+                        magnitude = elements->GetMagnitude();
                     }
                 }
                 if (a_AMC->GetIsDualCasting()) {
@@ -458,10 +466,28 @@ struct Hooks {
                 } else {
                     RE::DebugNotification("Not enough health to cast this spell", nullptr, true);
                     breakloop = 1;
-
                 }
-
             }
+            // if (settings check) {
+            if (a_AMC->currentSpell->GetCostliestEffectItem()->baseEffect->GetMinimumSkillLevel()) {
+                float scalingcost = 100.0f;
+                float basecost = 0.0f;
+                float staminacost = (a_AMC->currentSpell->GetCostliestEffectItem()->baseEffect->GetMinimumSkillLevel() *
+                                     scalingcost / 100.0f) +
+                                    basecost;
+                RE::HandleEntryPoint(RE::PerkEntryPoint::kModSpellCost, a, &staminacost, "CastSpell", 20,
+                                     {a_AMC->currentSpell});
+                if (staminacost < a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)) {
+                    a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                              RE::ActorValue::kStamina, -staminacost);
+                } else {
+                    a->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage,
+                                                              RE::ActorValue::kStamina, -(a->AsActorValueOwner()->GetActorValue(RE::ActorValue::kStamina)));
+                }
+            
+            }
+            //}
+
             std::vector<RE::SpellItem*> vecSpellsStartCast;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kApplyReanimateSpell, a, &vecSpellsStartCast, "CastSpell", 15,
                                  {a_AMC->currentSpell, a});
@@ -843,7 +869,8 @@ struct Hooks {
                                     a_Killed->playbackSpeed = weaponspeedmult;
                                 }
                             }
-                        } else {
+                        } 
+                        else {
                             auto id = get_implicit_id_event(a_context.behavior, "HitFrame");
                             if (a_Killed->triggers.get()) {
                                 for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
