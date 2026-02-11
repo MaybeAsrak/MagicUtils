@@ -468,10 +468,10 @@ struct Hooks {
                     breakloop = 1;
                 }
             }
-            // if (settings check) {
-            if (a_AMC->currentSpell->GetCostliestEffectItem()->baseEffect->GetMinimumSkillLevel()) {
-                float scalingcost = 100.0f;
-                float basecost = 0.0f;
+            if (*Settings::CastingDrainsStamina == true) {
+                if (a_AMC->currentSpell->GetCostliestEffectItem()->baseEffect->GetMinimumSkillLevel()) {
+                float scalingcost = *Settings::MaxStaminaSpellCost;
+                float basecost = *Settings::BaseStaminaSpellCost;
                 float staminacost = (a_AMC->currentSpell->GetCostliestEffectItem()->baseEffect->GetMinimumSkillLevel() *
                                      scalingcost / 100.0f) +
                                     basecost;
@@ -486,7 +486,7 @@ struct Hooks {
                 }
             
             }
-            //}
+            }
 
             std::vector<RE::SpellItem*> vecSpellsStartCast;
             RE::HandleEntryPoint(RE::PerkEntryPoint::kApplyReanimateSpell, a, &vecSpellsStartCast, "CastSpell", 15,
@@ -842,7 +842,7 @@ struct Hooks {
                     auto a_actor = a_graph->holder;
                     bool attacking = false;
                     std::string_view human = "ActorTypeNPC";
-                    int hitframes;
+                    int hitframes = 0;
                     //if (a_actor && a_actor == RE::PlayerCharacter::GetSingleton()) {
                     //    // if (IsCurrentAnimSubString(a_Killed->animationName.c_str(), "Whirlwind")) {
 
@@ -866,7 +866,18 @@ struct Hooks {
 
                                     RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor,
                                                          &weaponspeedmult, "TimeScale", 3, {});
-                                    a_Killed->playbackSpeed = weaponspeedmult;
+                                    if (weaponspeedmult == 0.0f) {
+                                    if (*Settings::CreatureWeaponSpeedBaseValueZero == true) {
+                                        a_Killed->playbackSpeed = 1.0f;
+                                        
+                                    }
+                                    if (*Settings::CreatureWeaponSpeedDefaultMessage == true) {
+                                        RE::DebugNotification("Creature Weaponspeedmult detected as 0, consider changing aTweaks toml settings", nullptr, true);
+                                    }                                   
+                                    } else {
+                                        a_Killed->playbackSpeed = weaponspeedmult;
+                                    
+                                    }
                                 }
                             }
                         } 

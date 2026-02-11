@@ -9,6 +9,8 @@ public:
     using fSetting = AutoTOML::fSetting;
 
     static inline bSetting CreatureWeaponSpeed{ "Patches", "CreatureWeaponSpeed", true };
+    static inline bSetting CreatureWeaponSpeedBaseValueZero{"Patches", "CreatureWeaponSpeedBaseValueZero", true};
+    static inline bSetting CreatureWeaponSpeedDefaultMessage{"Patches", "CreatureWeaponSpeedDefaultMessage", true};
     static inline bSetting WhirlwindSprint{"Patches", "WhirlwindSprint", true};
     static inline fSetting ProjectileSlowZone{"Patches", "ProjectileSlowZone", 50.0f};
     static inline bSetting MovementSpeedFix{"Patches", "MovementSpeedFix", true};
@@ -19,6 +21,10 @@ public:
     static inline bSetting PowerAttackEnchant{"Patches", "PowerAttackEnchant", true};
     static inline fSetting PowerAttackEnchantBaseMag{"Patches", "PowerAttackEnchantBaseMag", 2.0f};
     static inline bSetting UseVanillaAV{"Patches", "UseVanillaAV", true};   
+    static inline bSetting CastingDrainsStamina{"Patches", "CastingDrainsStamina", false};   
+    static inline fSetting BaseStaminaSpellCost{"Patches", "BaseStaminaSpellCost", 5.0f};   
+    static inline fSetting MaxStaminaSpellCost{"Patches", "MaxStaminaSpellCost", 25.0f};   
+
 
 
 
