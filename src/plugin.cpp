@@ -866,34 +866,40 @@ struct Hooks {
 
                                     RE::HandleEntryPoint(RE::PerkEntryPoint::kModPercentBlocked, a_actor,
                                                          &weaponspeedmult, "TimeScale", 3, {});
-                                    if (weaponspeedmult == 0.0f) {
+                                    if (*Settings::CreatureWeaponSpeedDefaultMessage == true && weaponspeedmult == 0.0f) {
+                                    RE::DebugNotification(
+                                        "Creature Weaponspeedmult detected as 0, consider changing aTweaks toml "
+                                        "settings",
+                                        nullptr, true);
+                                    }                                   
+
                                     if (*Settings::CreatureWeaponSpeedBaseValueZero == true) {
-                                        a_Killed->playbackSpeed = 1.0f;
+                                        weaponspeedmult = weaponspeedmult + 1.0f;
                                         
                                     }
-                                    if (*Settings::CreatureWeaponSpeedDefaultMessage == true) {
-                                        RE::DebugNotification("Creature Weaponspeedmult detected as 0, consider changing aTweaks toml settings", nullptr, true);
-                                    }                                   
-                                    } else {
-                                        a_Killed->playbackSpeed = weaponspeedmult;
+                                    a_Killed->playbackSpeed = std::max(weaponspeedmult, 0.05f);
                                     
-                                    }
                                 }
                             }
                         } 
-                        else {
-                            auto id = get_implicit_id_event(a_context.behavior, "HitFrame");
-                            if (a_Killed->triggers.get()) {
-                                for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
-                                    if (a_Killed->triggers.get()->triggers[i].event.id == id) {
-                                    ++hitframes;
-                                    }
-                                }
-                                if (hitframes > 1) {
-                                    a_Killed->playbackSpeed *= 0.33f + float(1/(hitframes+1));
-                                }
-                            }
-                        }
+                        //else {
+                        //    if (*Settings::CreatureWeaponSpeedDefaultMessage == true) {
+                        //        if (a_actor.i)
+                        //        auto id = get_implicit_id_event(a_context.behavior, "HitFrame");
+                        //        if (a_Killed->triggers.get()) {
+                        //            for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
+                        //                if (a_Killed->triggers.get()->triggers[i].event.id == id) {
+                        //                    ++hitframes;
+                        //                }
+                        //            }
+                        //            if (hitframes > 1) {
+                        //                a_Killed->playbackSpeed = a_actor->AsActorValueOwner()->GetActorValue(
+                        //                                              RE::ActorValue::kWeaponSpeedMult) *
+                        //                                          (0.33f + float(1 / (hitframes + 1)));
+                        //            }
+                        //        }
+                        //    }
+                        //}
                     }
             }
         }
@@ -1295,6 +1301,146 @@ if (a_proje->GetActorCause()) {
             }
             /// add manual regen perk entry points. 
 
+            if (*Settings::ProgressiveStaminaDebuffs == true) {
+                //if (a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kRightAttackCondition)) > 1.0f) {
+                //                a_player->AsActorValueOwner()->ModActorValue(
+                //                    RE::ActorValue::kRightAttackCondition,
+                //                    (1.0f - a_player->AsActorValueOwner()->GetActorValue(
+                //                                (RE::ActorValue::kRightAttackCondition))));
+
+                //}
+                float previousstaminapercent =                     a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kRightAttackCondition));
+
+                float currentstamina =
+                    a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kStamina));
+
+                float maxstamina = a_player->AsActorValueOwner()->GetBaseActorValue((RE::ActorValue::kStamina)) +
+                    a_player->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, (RE::ActorValue::kStamina)) +
+                    a_player->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, (RE::ActorValue::kStamina));
+            
+                float currentstaminapercent = 100.0f * currentstamina / maxstamina;
+
+                float previousdebuffpercent = std::max(float(*Settings::ProgressiveStaminaDebuffStartValue - (previousstaminapercent)),0.0f) /(*Settings::ProgressiveStaminaDebuffStartValue);
+                float currentdebuffpercent =
+                    std::max(float(*Settings::ProgressiveStaminaDebuffStartValue - (currentstaminapercent)),
+                             0.0f) /
+                    (*Settings::ProgressiveStaminaDebuffStartValue);
+                float changeindebuffpercent = currentdebuffpercent - previousdebuffpercent;
+
+                float previousspeedmult = 0.0f;
+                float currentspeedmult = 0.0f;
+
+                float previousspellcost = 0.0f;
+                float currentspellcost = 0.0f;
+
+                float previousstaminarate = 0.0f;
+                float currentstaminarate = 0.0f;
+
+                float previousattackdamage = 0.0f;
+                float currentattackdamage = 0.0f;
+
+                float previousattackspeed = 0.0f;
+                float currentattackspeed = 0.0f;
+                float deltaspeedmult = 0.0f;
+
+
+
+
+
+
+                if (previousdebuffpercent > 0.0f) {
+                    
+                    previousspeedmult = (*Settings::ScalingMovementSpeedMinValue + (*Settings::ScalingMovementSpeedMaxValue-*Settings::ScalingMovementSpeedMinValue)*previousdebuffpercent);
+                    previousspellcost = (*Settings::ScalingSpellCostMinValue + (*Settings::ScalingSpellCostMaxValue-*Settings::ScalingSpellCostMinValue)*previousdebuffpercent);
+                    previousstaminarate = (*Settings::ScalingStaminaRegenMinValue + (*Settings::ScalingStaminaRegenMaxValue-*Settings::ScalingStaminaRegenMinValue)*previousdebuffpercent);
+                    previousattackdamage = (*Settings::ScalingAttackDamageMinValue + (*Settings::ScalingAttackDamageMaxValue-*Settings::ScalingAttackDamageMinValue)*previousdebuffpercent);
+                    previousattackspeed = (*Settings::ScalingAttackSpeedMinValue + (*Settings::ScalingAttackSpeedMaxValue-*Settings::ScalingAttackSpeedMinValue)*previousdebuffpercent);
+
+
+                
+                }             
+                if (currentdebuffpercent > 0.0f) {
+
+                    currentspeedmult =
+                        (*Settings::ScalingMovementSpeedMinValue +
+                         (*Settings::ScalingMovementSpeedMaxValue - *Settings::ScalingMovementSpeedMinValue) *
+                             currentdebuffpercent);
+                    currentspellcost = (*Settings::ScalingSpellCostMinValue +
+                                        (*Settings::ScalingSpellCostMaxValue - *Settings::ScalingSpellCostMinValue) *
+                                            currentdebuffpercent);
+                    currentstaminarate =
+                        (*Settings::ScalingStaminaRegenMinValue +
+                         (*Settings::ScalingStaminaRegenMaxValue - *Settings::ScalingStaminaRegenMinValue) *
+                             currentdebuffpercent);
+                    currentattackdamage =
+                        (*Settings::ScalingAttackDamageMinValue +
+                         (*Settings::ScalingAttackDamageMaxValue - *Settings::ScalingAttackDamageMinValue) *
+                             currentdebuffpercent);
+                    currentattackspeed =
+                        (*Settings::ScalingAttackSpeedMinValue +
+                         (*Settings::ScalingAttackSpeedMaxValue - *Settings::ScalingAttackSpeedMinValue) *
+                             currentdebuffpercent);
+
+
+                
+                } 
+                if (currentspeedmult == 0.0f && previousspeedmult == 0.0f) {
+                    deltaspeedmult = 0.0f;
+                } else {
+                    deltaspeedmult = currentspeedmult - previousspeedmult;
+                
+                }
+                float deltaspellcost = currentspellcost - previousspellcost;
+                float deltastaminarate = currentstaminarate - previousstaminarate;
+                float deltaattackdamage = currentattackdamage - previousattackdamage;
+                float deltaattackspeed = currentattackspeed - previousattackspeed;
+            
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent, RE::ActorValue::kSpeedMult, -deltaspeedmult);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kIllusionModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kDestructionModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kConjurationModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kRestorationModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kAlterationModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kStaminaRateMult, -deltastaminarate);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kAttackDamageMult, -deltaattackdamage);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kWeaponSpeedMult, -deltaattackspeed);
+                a_player->AsActorValueOwner()->RestoreActorValue(
+                    RE::ACTOR_VALUE_MODIFIER::kPermanent, RE::ActorValue::kLeftWeaponSpeedMultiply, -deltaattackspeed);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                             RE::ActorValue::kRightAttackCondition,
+                                                             (currentstaminapercent - previousstaminapercent));
+
+                //char buffer[150];
+
+                //sprintf_s(buffer, "stms: %f, %f, %f, %f, %f", previousstaminapercent, currentstaminapercent,
+                //          deltaspeedmult, previousspeedmult, currentspeedmult);
+                //RE::ConsoleLog::GetSingleton()->Print(buffer);
+            
+            
+            
+            
+            
+            }
+
+
+
+
+
+
+
+
+
+
+
+
             func(a_player, a_delta);
 
         }
@@ -1337,7 +1483,133 @@ if (a_proje->GetActorCause()) {
 //                }
 //            }
 
+                        if (*Settings::ProgressiveStaminaDebuffs == true) {
+                // if (a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kRightAttackCondition)) > 1.0f) {
+                //                 a_player->AsActorValueOwner()->ModActorValue(
+                //                     RE::ActorValue::kRightAttackCondition,
+                //                     (1.0f - a_player->AsActorValueOwner()->GetActorValue(
+                //                                 (RE::ActorValue::kRightAttackCondition))));
 
+                //}
+                auto a_player = a_char;
+                float previousstaminapercent =
+                    a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kRightAttackCondition));
+
+                float currentstamina = a_player->AsActorValueOwner()->GetActorValue((RE::ActorValue::kStamina));
+
+                float maxstamina =
+                    a_player->AsActorValueOwner()->GetBaseActorValue((RE::ActorValue::kStamina)) +
+                    a_player->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kPermanent, (RE::ActorValue::kStamina)) +
+                    a_player->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, (RE::ActorValue::kStamina));
+
+                float currentstaminapercent = 100.0f * currentstamina / maxstamina;
+
+                float previousdebuffpercent =
+                    std::max(float(*Settings::ProgressiveStaminaDebuffStartValue - (previousstaminapercent)), 0.0f) /
+                    (*Settings::ProgressiveStaminaDebuffStartValue);
+                float currentdebuffpercent =
+                    std::max(float(*Settings::ProgressiveStaminaDebuffStartValue - (currentstaminapercent)), 0.0f) /
+                    (*Settings::ProgressiveStaminaDebuffStartValue);
+                float changeindebuffpercent = currentdebuffpercent - previousdebuffpercent;
+
+                float previousspeedmult = 0.0f;
+                float currentspeedmult = 0.0f;
+
+                float previousspellcost = 0.0f;
+                float currentspellcost = 0.0f;
+
+                float previousstaminarate = 0.0f;
+                float currentstaminarate = 0.0f;
+
+                float previousattackdamage = 0.0f;
+                float currentattackdamage = 0.0f;
+
+                float previousattackspeed = 0.0f;
+                float currentattackspeed = 0.0f;
+                float deltaspeedmult = 0.0f;
+
+                if (previousdebuffpercent > 0.0f) {
+                    previousspeedmult =
+                        (*Settings::ScalingMovementSpeedMinValue +
+                         (*Settings::ScalingMovementSpeedMaxValue - *Settings::ScalingMovementSpeedMinValue) *
+                             previousdebuffpercent);
+                    previousspellcost = (*Settings::ScalingSpellCostMinValue +
+                                         (*Settings::ScalingSpellCostMaxValue - *Settings::ScalingSpellCostMinValue) *
+                                             previousdebuffpercent);
+                    previousstaminarate =
+                        (*Settings::ScalingStaminaRegenMinValue +
+                         (*Settings::ScalingStaminaRegenMaxValue - *Settings::ScalingStaminaRegenMinValue) *
+                             previousdebuffpercent);
+                    previousattackdamage =
+                        (*Settings::ScalingAttackDamageMinValue +
+                         (*Settings::ScalingAttackDamageMaxValue - *Settings::ScalingAttackDamageMinValue) *
+                             previousdebuffpercent);
+                    previousattackspeed =
+                        (*Settings::ScalingAttackSpeedMinValue +
+                         (*Settings::ScalingAttackSpeedMaxValue - *Settings::ScalingAttackSpeedMinValue) *
+                             previousdebuffpercent);
+                }
+                if (currentdebuffpercent > 0.0f) {
+                    currentspeedmult =
+                        (*Settings::ScalingMovementSpeedMinValue +
+                         (*Settings::ScalingMovementSpeedMaxValue - *Settings::ScalingMovementSpeedMinValue) *
+                             currentdebuffpercent);
+                    currentspellcost = (*Settings::ScalingSpellCostMinValue +
+                                        (*Settings::ScalingSpellCostMaxValue - *Settings::ScalingSpellCostMinValue) *
+                                            currentdebuffpercent);
+                    currentstaminarate =
+                        (*Settings::ScalingStaminaRegenMinValue +
+                         (*Settings::ScalingStaminaRegenMaxValue - *Settings::ScalingStaminaRegenMinValue) *
+                             currentdebuffpercent);
+                    currentattackdamage =
+                        (*Settings::ScalingAttackDamageMinValue +
+                         (*Settings::ScalingAttackDamageMaxValue - *Settings::ScalingAttackDamageMinValue) *
+                             currentdebuffpercent);
+                    currentattackspeed =
+                        (*Settings::ScalingAttackSpeedMinValue +
+                         (*Settings::ScalingAttackSpeedMaxValue - *Settings::ScalingAttackSpeedMinValue) *
+                             currentdebuffpercent);
+                }
+                if (currentspeedmult == 0.0f && previousspeedmult == 0.0f) {
+                    deltaspeedmult = 0.0f;
+                } else {
+                    deltaspeedmult = currentspeedmult - previousspeedmult;
+                }
+                float deltaspellcost = currentspellcost - previousspellcost;
+                float deltastaminarate = currentstaminarate - previousstaminarate;
+                float deltaattackdamage = currentattackdamage - previousattackdamage;
+                float deltaattackspeed = currentattackspeed - previousattackspeed;
+
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kSpeedMult, -deltaspeedmult);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kIllusionModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kDestructionModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kConjurationModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kRestorationModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kAlterationModifier, -deltaspellcost);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kStaminaRateMult, -deltastaminarate);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kAttackDamageMult, -deltaattackdamage);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kWeaponSpeedMult, -deltaattackspeed);
+                a_player->AsActorValueOwner()->RestoreActorValue(
+                    RE::ACTOR_VALUE_MODIFIER::kPermanent, RE::ActorValue::kLeftWeaponSpeedMultiply, -deltaattackspeed);
+                a_player->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent,
+                                                                 RE::ActorValue::kRightAttackCondition,
+                                                                 (currentstaminapercent - previousstaminapercent));
+
+                //char buffer[150];
+
+                //sprintf_s(buffer, "stms: %f, %f, %f, %f, %f", previousstaminapercent, currentstaminapercent,
+                //          deltaspeedmult, previousspeedmult, currentspeedmult);
+                //RE::ConsoleLog::GetSingleton()->Print(buffer);
+            }
 
 
 
@@ -1799,7 +2071,7 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse) {
     SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message *message) {
         if (message->type == SKSE::MessagingInterface::kDataLoaded) {
         
-        if (Settings::load_config("Data/SKSE/Plugins/Asrak.toml"s)) {
+        if (Settings::load_config("Data/SKSE/Plugins/aTweaks.toml"s)) {
                 RE::ConsoleLog::GetSingleton()->Print("Atweaks Settings Loaded");
         } else {
                 RE::ConsoleLog::GetSingleton()->Print("Atweaks Settings not found");

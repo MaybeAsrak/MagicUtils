@@ -9,8 +9,9 @@ public:
     using fSetting = AutoTOML::fSetting;
 
     static inline bSetting CreatureWeaponSpeed{ "Patches", "CreatureWeaponSpeed", true };
-    static inline bSetting CreatureWeaponSpeedBaseValueZero{"Patches", "CreatureWeaponSpeedBaseValueZero", true};
+    static inline bSetting CreatureWeaponSpeedBaseValueZero{"Patches", "CreatureWeaponSpeedBaseValueZero", false};
     static inline bSetting CreatureWeaponSpeedDefaultMessage{"Patches", "CreatureWeaponSpeedDefaultMessage", true};
+
     static inline bSetting WhirlwindSprint{"Patches", "WhirlwindSprint", true};
     static inline fSetting ProjectileSlowZone{"Patches", "ProjectileSlowZone", 50.0f};
     static inline bSetting MovementSpeedFix{"Patches", "MovementSpeedFix", true};
@@ -21,9 +22,27 @@ public:
     static inline bSetting PowerAttackEnchant{"Patches", "PowerAttackEnchant", true};
     static inline fSetting PowerAttackEnchantBaseMag{"Patches", "PowerAttackEnchantBaseMag", 2.0f};
     static inline bSetting UseVanillaAV{"Patches", "UseVanillaAV", true};   
+
     static inline bSetting CastingDrainsStamina{"Patches", "CastingDrainsStamina", false};   
     static inline fSetting BaseStaminaSpellCost{"Patches", "BaseStaminaSpellCost", 5.0f};   
     static inline fSetting MaxStaminaSpellCost{"Patches", "MaxStaminaSpellCost", 25.0f};   
+
+    static inline bSetting ProgressiveStaminaDebuffs{"Patches", "ProgressiveStaminaDebuffs", false};   
+    static inline fSetting ProgressiveStaminaDebuffStartValue{"Patches", "ProgressiveStaminaDebuffStartValue", 40.0f};   
+    static inline fSetting ScalingAttackSpeedMinValue{"Patches", "ScalingAttackSpeedMinValue", 0.0f};   
+    static inline fSetting ScalingAttackSpeedMaxValue{"Patches", "ScalingAttackSpeedMaxValue", 0.25f};   
+    static inline fSetting ScalingMovementSpeedMinValue{"Patches", "ScalingMovementSpeedMinValue", 0.0f};
+    static inline fSetting ScalingMovementSpeedMaxValue{"Patches", "ScalingMovementSpeedMaxValue", 85.0f};   
+    static inline fSetting ScalingStaminaRegenMinValue{"Patches", "ScalingStaminaRegenMinValue", 0.0f};
+    static inline fSetting ScalingStaminaRegenMaxValue{"Patches", "ScalingStaminaRegenMaxValue", 25000.0f};   
+    static inline fSetting ScalingAttackDamageMinValue{"Patches", "ScalingAttackDamageMinValue", 0.0f};
+    static inline fSetting ScalingAttackDamageMaxValue{"Patches", "ScalingAttackDamageMaxValue", 25.0f};   
+    static inline fSetting ScalingSpellCostMinValue{"Patches", "ScalingSpellCostMinValue", 0.0f};
+    static inline fSetting ScalingSpellCostMaxValue{"Patches", "ScalingSpellCostMaxValue", 25.0f};   
+       
+      
+       
+      
 
 
 
