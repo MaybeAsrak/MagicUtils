@@ -882,24 +882,29 @@ struct Hooks {
                                 }
                             }
                         } 
-                        //else {
-                        //    if (*Settings::CreatureWeaponSpeedDefaultMessage == true) {
-                        //        if (a_actor.i)
-                        //        auto id = get_implicit_id_event(a_context.behavior, "HitFrame");
-                        //        if (a_Killed->triggers.get()) {
-                        //            for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
-                        //                if (a_Killed->triggers.get()->triggers[i].event.id == id) {
-                        //                    ++hitframes;
-                        //                }
-                        //            }
-                        //            if (hitframes > 1) {
-                        //                a_Killed->playbackSpeed = a_actor->AsActorValueOwner()->GetActorValue(
-                        //                                              RE::ActorValue::kWeaponSpeedMult) *
-                        //                                          (0.33f + float(1 / (hitframes + 1)));
-                        //            }
-                        //        }
-                        //    }
-                        //}
+                        else {
+                            if (a_actor) {
+                                auto id = get_implicit_id_event(a_context.behavior, "HitFrame");
+                                auto id2 = get_implicit_id_event(a_context.behavior, "AttackWinEnd");
+                                if (a_Killed->triggers.get()) {
+                                    for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
+                                        if (a_Killed->triggers.get()->triggers[i].event.id == id) {
+                                            ++hitframes;
+                                            if (hitframes > 1) {
+                                                a_Killed->triggers.get()->triggers[i].event.id == id2;
+                                                                 RE::ConsoleLog::GetSingleton()->Print("pon de floor!");
+
+                                            }
+                                        }
+                                    }
+                                    if (hitframes > 1) {
+                                        a_Killed->playbackSpeed = a_actor->AsActorValueOwner()->GetActorValue(
+                                                                      RE::ActorValue::kWeaponSpeedMult) *
+                                                                  (0.33f + float(1 / (hitframes + 1)));
+                                    }
+                                }
+                            }
+                        }
                     }
             }
         }
