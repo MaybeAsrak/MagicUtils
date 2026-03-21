@@ -886,23 +886,29 @@ struct Hooks {
                             if (a_actor) {
                                 auto id = get_implicit_id_event(a_context.behavior, "HitFrame");
                                 auto id2 = get_implicit_id_event(a_context.behavior, "AttackWinEnd");
+                                if (!IsCurrentAnimSubString(a_Killed->animationName.c_str(), "SpecialAttackPower") &&
+                                    !IsCurrentAnimSubString(a_Killed->animationName.c_str(), "H2H_Attack") &&
+                                    !IsCurrentAnimSubString(a_Killed->animationName.c_str(), "DW1HM1HM_PowerAttack") &&
+                                    !IsCurrentAnimSubString(a_Killed->animationName.c_str(), "AttackPowerKnifeSlashCombo")) {
+                                
                                 if (a_Killed->triggers.get()) {
                                     for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
                                         if (a_Killed->triggers.get()->triggers[i].event.id == id) {
                                             ++hitframes;
                                             if (hitframes > 1) {
-                                                a_Killed->triggers.get()->triggers[i].event.id == id2;
-                                                                 RE::ConsoleLog::GetSingleton()->Print("pon de floor!");
-
+                                                 a_Killed->triggers.get()->triggers[i].event.id =
+                                                 static_cast<RE::hkbEventBase::SystemEventIDs>(id2);
+                                                //RE::ConsoleLog::GetSingleton()->Print(a_Killed->animationName.c_str());
                                             }
                                         }
                                     }
-                                    if (hitframes > 1) {
-                                        a_Killed->playbackSpeed = a_actor->AsActorValueOwner()->GetActorValue(
-                                                                      RE::ActorValue::kWeaponSpeedMult) *
-                                                                  (0.33f + float(1 / (hitframes + 1)));
-                                    }
+                                    // if (hitframes > 1) {
+                                    //     a_Killed->playbackSpeed = a_actor->AsActorValueOwner()->GetActorValue(
+                                    //                                   RE::ActorValue::kWeaponSpeedMult) *
+                                    //                               (0.33f + float(1 / (hitframes + 1)));
+                                    // }
                                 }
+                            }
                             }
                         }
                     }
@@ -1231,8 +1237,21 @@ if (a_proje->GetActorCause()) {
                 a_thismmpc->AsActorValueOwner()->GetActorValue(RE::ActorValue::kSpeedMult) < 1.0f) {
                 Delta.x *= 0.01f;
                 Delta.y *= 0.01f;
-
+                //&&(a_thismmpc->AsActorState()->GetAttackState() == (RE::ATTACK_STATE_ENUM::kSwing) ||
+                //   a_thismmpc->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kHit ||
+                //   a_thismmpc->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kFollowThrough ||
+                //   a_thismmpc->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kNextAttack)
             }
+            if (*Settings::PowerAttackingForcedMovement != 100.0f) {
+                if (a_thismmpc->GetActorRuntimeData().currentProcess->high->attackData.get()) {
+                    if (a_thismmpc->GetActorRuntimeData().currentProcess->high->attackData.get()->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
+                    Delta.x *= *Settings::PowerAttackingForcedMovement/100.0f;
+                    Delta.y *= *Settings::PowerAttackingForcedMovement/100.0f;
+                    //RE::ConsoleLog::GetSingleton()->Print("test torob");
+                }
+                }
+            }
+
             return func(a_thismmpc, a_arg2, Delta);
         }
         static inline REL::Relocation<decltype(thunk)> func;

@@ -12,6 +12,11 @@ public:
     static inline bSetting CreatureWeaponSpeedBaseValueZero{"Patches", "CreatureWeaponSpeedBaseValueZero", false};
     static inline bSetting CreatureWeaponSpeedDefaultMessage{"Patches", "CreatureWeaponSpeedDefaultMessage", true};
 
+    static inline bSetting MultiHitFix{"Patches", "MultiHitFix", true};
+    static inline fSetting PowerAttackingForcedMovement{"Patches", "PowerAttackingForcedMovement", 75.0f};
+
+
+
     static inline bSetting WhirlwindSprint{"Patches", "WhirlwindSprint", true};
     static inline fSetting ProjectileSlowZone{"Patches", "ProjectileSlowZone", 50.0f};
     static inline bSetting MovementSpeedFix{"Patches", "MovementSpeedFix", true};
