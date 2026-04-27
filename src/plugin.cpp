@@ -895,12 +895,33 @@ struct Hooks {
                                     for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
                                         if (a_Killed->triggers.get()->triggers[i].event.id == id) {
                                             ++hitframes;
-                                            if (hitframes > 1) {
-                                                 a_Killed->triggers.get()->triggers[i].event.id =
-                                                 static_cast<RE::hkbEventBase::SystemEventIDs>(id2);
-                                                //RE::ConsoleLog::GetSingleton()->Print(a_Killed->animationName.c_str());
+                                            //if (hitframes > 1) {
+
+                                            //     //a_Killed->triggers.get()->triggers[i].event.id =
+                                            //     //static_cast<RE::hkbEventBase::SystemEventIDs>(id2);
+                                            //    RE::ConsoleLog::GetSingleton()->Print(a_Killed->animationName.c_str());
+                                            //}
+                                        }
+                                    }
+
+                                    if (hitframes > 1) {
+                                        int hitframesmax = hitframes;
+                                        std::random_device dev;
+                                        std::mt19937 rng(dev());
+                                        std::uniform_int_distribution<std::mt19937::result_type> dist6(1, hitframesmax);
+                                        hitframesmax = dist6(rng);
+                                        hitframes = 0;
+                                        for (uint32_t i = 0; i < a_Killed->triggers.get()->triggers.size(); i++) {
+                                            if (a_Killed->triggers.get()->triggers[i].event.id == id) {
+                                                 ++hitframes;
+                                                 if (hitframes == hitframesmax) {
+                                                     a_Killed->triggers.get()->triggers[i].event.id =
+                                                         static_cast<RE::hkbEventBase::SystemEventIDs>(id2);
+                                                     // RE::ConsoleLog::GetSingleton()->Print(a_Killed->animationName.c_str());
+                                                 }
                                             }
                                         }
+                                    
                                     }
                                     // if (hitframes > 1) {
                                     //     a_Killed->playbackSpeed = a_actor->AsActorValueOwner()->GetActorValue(
